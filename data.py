@@ -119,26 +119,26 @@ def make_dataset(args):
      
 
 
-def make_train_loader(args):
-    files = os.listdir("dataset/Amazon_few_shot")
-    root_dir = "dataset/Amazon_few_shot/"
-    token_ids = []
-    summarizer = make_summarizer(args.summary_method)
-    for file in tqdm.tqdm(files):
-        if "list" in file:
-            continue
-        path = os.path.join(root_dir, file)
-        with open(path, 'r', encoding='utf-8') as fin:
-            lines = fin.readlines()
-        for i, line in enumerate(lines):
-            text, label = line.split("\t")
-            text = text.strip()
-            sum_text = summarizer.sum_text(text)
-            ids = tokenizer.encode(text,padding=True,truncation=True, max_length=200)
-            sum_ids = tokenizer.encode(sum_text,padding=True,truncation=True, max_length=200)
-            ids += [1] * (200 - len(ids))
-            token_ids.append(ids)
-    dataset = torch.LongTensor(token_ids)
-    dataset = TensorDataset(dataset)
-    data_loader = DataLoader(dataset=dataset,batch_size=32, shuffle=True,num_workers=2)
-    return data_loader
+# def make_train_loader(args):
+#     files = os.listdir("dataset/Amazon_few_shot")
+#     root_dir = "dataset/Amazon_few_shot/"
+#     token_ids = []
+#     summarizer = make_summarizer(args.summary_method)
+#     for file in tqdm.tqdm(files):
+#         if "list" in file:
+#             continue
+#         path = os.path.join(root_dir, file)
+#         with open(path, 'r', encoding='utf-8') as fin:
+#             lines = fin.readlines()
+#         for i, line in enumerate(lines):
+#             text, label = line.split("\t")
+#             text = text.strip()
+#             sum_text = summarizer.sum_text(text)
+#             ids = tokenizer.encode(text,padding=True,truncation=True, max_length=200)
+#             sum_ids = tokenizer.encode(sum_text,padding=True,truncation=True, max_length=200)
+#             ids += [1] * (200 - len(ids))
+#             token_ids.append(ids)
+#     dataset = torch.LongTensor(token_ids)
+#     dataset = TensorDataset(dataset)
+#     data_loader = DataLoader(dataset=dataset,batch_size=32, shuffle=True,num_workers=2)
+#     return data_loader

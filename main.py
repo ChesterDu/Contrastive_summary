@@ -10,6 +10,8 @@ from models import EmbNetwork
 from builder import MoCo
 import data
 import os
+import tqdm
+from opt import OpenAIAdam
 
 
 
@@ -33,6 +35,8 @@ parser.add_argument('--momentum', type=float, default=0.9)
 parser.add_argument('--weight_decay',type=float, default=1e-5)
 parser.add_argument('--T', type=float, default=0.07)
 parser.add_argument('--lr', type=float, default=1e-4)
+parser.add_argument('--clip',type=float,default=1)
+parser.add_argument('--dist_func',type=str,default='cosin')
 parser.add_argument('--n_vocab', type=int, default=30000)
 parser.add_argument('--cnn_dim', type=int, default=256)
 parser.add_argument('--dense1_dim', type=int, default=256)
@@ -52,20 +56,14 @@ if torch.cuda.is_available():
 else:
     device = torch.device('cpu')
 
-args.distributed = False
-args.world_size = 1
-if 'WORLD_SIZE' in os.environ:
-    args.world_size = int(os.environ['WORLD_SIZE'])
-    args.distributed = args.world_size > 1
 
-if args.distributed:
+if args.local_rank != -1:
     # FOR DISTRIBUTED:  Set the device according to local_rank.
     torch.cuda.set_device(args.local_rank)
 
     # FOR DISTRIBUTED:  Initialize the backend.  torch.distributed.launch will provide
     # environment variables, and requires that you use init_method=`env://`.
-    torch.distributed.init_process_group(backend='nccl',
-                            init_method='env://')
+    torch.distributed.init_process_group(backend="nccl")
 
 
  ##make dataset
@@ -73,8 +71,88 @@ train_dataset = data.make_dataset(args)
 train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
 train_loader = DataLoader(train_dataset, num_workers=2,batch_size=args.batch_size, shuffle=True, drop_last=True,  sampler=train_sampler)
 
+##make model
 base_model = RobertaModel.from_pretrained("roberta-base")
-model = EmbNetwork(base_model, pooling_strategy='last').to(device)
+model = EmbNetwork(base_model, pooling_strategy='last').cuda()
+model = torch.nn.parallel.DistributedDataParallel(model,device_ids=[args.local_rank],output_device=args.local_rank)
+
+##make optimizer
+optimizer = OpenAIAdam(model.parameters(),
+                                  lr=args.lr,
+                                  schedule='warmup_linear',
+                                  warmup=0.002,
+                                  t_total=args.steps,
+                                  b1=0.9,
+                                  b2=0.999,
+                                  e=1e-08,
+                                  l2=0.01,
+                                  vector_l2=True,
+                                  max_grad_norm=args.clip)
+
+def batch_forward(model, batch):
+    anchor_ids, pos_ids, neg_ids, neural_ids = [item.cuda() for item in batch]
+    bsz = anchor_ids.shape[0]
+    anchor_feature = model(anchor_ids).unsqueeze(1) #(bsz,1,768)
+    hid_dim = anchor_feature.shape[2]
+
+    pos_feature = model(pos_ids).unsqueeze(1)   #(bsz,1,768)
+
+    neg_ids  = neg_ids.view(-1,hid_dim)
+    neg_feature = model(neg_ids).view(bsz,-1,hid_dim)   #(bsz,num_neg, 768)
+
+    neural_ids = neural_ids.view(-1, hid_dim)
+    neural_feature = model(neural_ids).view(bsz,-1,hid_dim) #(bsz,num_neg, 768)
+
+    return anchor_feature, pos_feature, neg_feature, neural_feature
+
+
+def train(args, model,train_loader,optimizer):
+
+    for iter_num in tqdm.tqdm(range(args.steps)):
+        optimizer.zero_grad()
+        batch = train_loader.next()
+        anchor_feature, pos_feature, neg_feature, neural_feature = batch_forward(model,batch)
+
+        d_pos = dist_function(anchor_feature, pos_feature,args.dist_func)
+        d_neg = dist_function(anchor_feature, neg_feature,args.dist_func)
+        d_neu = dist_function(anchor_feature, neural_feature,args.dist_func)
+
+        loss_neg = triplet_loss(d_pos,d_neg,margin=2.0)
+        loss_neu = triplet_loss(d_pos,d_neu,margin=1.0)
+
+        loss = loss_neg + loss_neu
+
+        loss.backward()
+        
+        optimizer.step()
+
+        
+
+        
+
+def triplet_loss(d_pos,d_neg,margin=1.0,method='cosin',reduction='mean'):
+    if method == 'cosin':
+        loss = torch.clamp(d_neg - d_pos + margin, min=0.0)
+    if method == 'ecludien':
+        loss = None ##TO BE ADD
+
+    if reduction=='mean':
+        loss = torch.mean(loss)
+
+    if reduction=='sum':
+        loss = torch.sum(loss)
+
+    return loss
+
+def dist_function(x1,x2,method='cosin'):
+    if method == 'cosin':
+        dist = F.cosine_similarity(x1,x2,dim=2)
+    
+    if method == 'ecludien':
+        dist = None         ##TO BE ADD
+
+    return dist
+
 
 
 # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
