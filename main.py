@@ -14,7 +14,7 @@ import tqdm
 from opt import OpenAIAdam
 from train import train
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '0,1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '3,4'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--encoder', type=str, default='cnn')
