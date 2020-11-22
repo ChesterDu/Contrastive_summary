@@ -2,10 +2,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers import RobertaModel
+from torch.utils.data import TensorDataset, DataLoader
 import argparse
+import random
+import torch.backends.cudnn as cudnn
 from models import EmbNetwork
 from builder import MoCo
 import data
+import os
 
 
 
@@ -16,7 +20,10 @@ parser.add_argument('--steps', type=int, default=10000)
 parser.add_argument('--num_neg',type=int,default=16)
 parser.add_argument('--summary_method',type=str,default="None")
 parser.add_argument("--toy",action='store_true')
+parser.add_argument("--local_rank",type=int, default=0)
+parser.add_argument("--num_workers",type=int,default=1)
 parser.add_argument("--toy_size",type=int,default=1000)
+parser.add_argument("--seed",type=int,default=41)
 parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--max_len",type=int, default=256)
 parser.add_argument('--epochs', type=int, default=10)
@@ -33,6 +40,37 @@ parser.add_argument('--winsize', type=int, default=5)
 parser.add_argument('--padding', type=int, default=1)
 
 args = parser.parse_args()
+
+
+if args.seed is not None:
+    random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    cudnn.deterministic = True
+
+if torch.cuda.is_available():
+    device = torch.device('cuda')
+else:
+    device = torch.device('cpu')
+
+args.distributed = False
+args.world_size = 1
+if 'WORLD_SIZE' in os.environ:
+    args.world_size = int(os.environ['WORLD_SIZE'])
+    args.distributed = args.world_size > 1
+
+if args.distributed:
+    # FOR DISTRIBUTED:  Set the device according to local_rank.
+    torch.cuda.set_device(args.local_rank)
+
+    # FOR DISTRIBUTED:  Initialize the backend.  torch.distributed.launch will provide
+    # environment variables, and requires that you use init_method=`env://`.
+    torch.distributed.init_process_group(backend='nccl',
+                            init_method='env://')
+
+train_dataset = data.make_dataset(args)
+train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+train_loader = DataLoader(train_dataset, num_workers=2,batch_size=args.batch_size, shuffle=True, drop_last=True,  sampler=train_sampler)
+
 
 
 # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -58,11 +96,7 @@ args = parser.parse_args()
 #         loss.backward()
 #         optimizer.step()
 
-train_loader = data.make_dataloader(args)
-for batch in train_loader:
-    for item in batch:
-        print(item.shape)
-    break
+
 
 
 

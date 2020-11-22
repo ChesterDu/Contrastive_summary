@@ -77,7 +77,7 @@ def create_neutual_samples(args, seqs, summarizer):
     return neutual_samples
 
 
-def make_dataloader(args):
+def make_dataset(args):
     summarizer = make_summarizer(args.summary_method)
 
     anchor_seqs = read_all_sequences()
@@ -102,9 +102,9 @@ def make_dataloader(args):
         neutral_seqs_ids[i] = tokenizer(neutral_seq, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
 
     dataset = TensorDataset(anchor_seqs_ids, pos_seqs_ids, neg_seqs_ids, neutral_seqs_ids)
-    data_loader = DataLoader(dataset=dataset,batch_size=args.batch_size, shuffle=True,num_workers=2)
+    # data_loader = DataLoader(dataset=dataset,batch_size=args.batch_size, shuffle=True,num_workers=2)
 
-    return data_loader
+    return dataset
 
     # print("Anchor======",anchor_seqs[0])
     # print("Pos======",pos_seqs[0])
