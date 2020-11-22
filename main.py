@@ -16,6 +16,8 @@ parser.add_argument('--steps', type=int, default=10000)
 parser.add_argument('--num_neg',type=int,default=16)
 parser.add_argument('--summary_method',type=str,default="None")
 parser.add_argument("--toy",action='store_true')
+parser.add_argument("--toy_size",type=int,default=1000)
+parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument('--epochs', type=int, default=10)
 parser.add_argument('--K', type=int, default=65536)
 parser.add_argument('--m', type=float, default=0.99)
@@ -55,7 +57,11 @@ args = parser.parse_args()
 #         loss.backward()
 #         optimizer.step()
 
-data.make_dataloader(args)
+train_loader = data.make_dataloader(args)
+for batch in train_loader:
+    for item in batch:
+        print(item.shape)
+    break
 
 
 

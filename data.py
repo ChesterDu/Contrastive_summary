@@ -30,11 +30,14 @@ def read_all_sequences():
     random.shuffle(seqs)
     return seqs
 
-def create_pos_samples(seqs,summarizer):
+def create_pos_samples(args, seqs,summarizer):
     print("create pos samples begin====")
+    num_iter = len(seqs)
+    if args.toy:
+        num_iter = args.toy_size
     sums = []
-    for seq in tqdm.tqdm(seqs):
-        sum_seq = summarizer.sum_text(seq)
+    for i in tqdm.tqdm(range(num_iter)):
+        sum_seq = summarizer.sum_text(seqs[i])
         sums.append(sum_seq)
 
     return sums
@@ -44,7 +47,7 @@ def create_negative_samples(args, seqs, summarizer):
     print("create neg samples begin====")
     num_iter = len(seqs)
     if args.toy:
-        num_iter = 100
+        num_iter = args.toy_size
     for i in tqdm.tqdm(range(num_iter)):
         neg = []
         id_pool = np.arange(len(seqs))
@@ -61,7 +64,7 @@ def create_neutual_samples(args, seqs, summarizer):
     print("create neutual samples begin====")
     num_iter = len(seqs)
     if args.toy:
-        num_iter = 100
+        num_iter = args.toy_size
     for i in tqdm.tqdm(range(num_iter)):
         neutual = []
         id_pool = np.arange(len(seqs))
@@ -78,15 +81,36 @@ def make_dataloader(args):
     summarizer = make_summarizer(args.summary_method)
 
     anchor_seqs = read_all_sequences()
-    pos_seqs = create_pos_samples(anchor_seqs, summarizer)
+    pos_seqs = create_pos_samples(args, anchor_seqs, summarizer)
     neg_seqs = create_negative_samples(args, anchor_seqs, summarizer)
     neutral_seqs = create_neutual_samples(args, anchor_seqs, summarizer)
+    if args.toy:
+        anchor_seqs = anchor_seqs[:args.toy_size]
 
-    print("Anchor======",anchor_seqs[0])
-    print("Pos======",pos_seqs[0])
-    print("Neg======",neg_seqs[0])
-    print("Neu======",neutral_seqs[0])
-    # print(anchor_seqs[0],pos_seqs[0],neg_seqs[0],neutral_seqs[0])
+    print("begin to make anchor ids=====")
+    anchor_seqs_ids = tokenizer(anchor_seqs, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+    print("begin to make pos seqs ids=====")
+    pos_seqs_ids = tokenizer(pos_seqs, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+    print("begin to make neg seqs ids=====")
+    neg_seqs_ids = torch.LongTensor(anchor_seqs_ids.shape[0],args.num_neg,200)
+    for i,neg_seq in enumerate(neg_seqs):
+        neg_seqs_ids[i] = tokenizer(neg_seq, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+
+    print("begin to make neg neutral ids=====")
+    neutral_seqs_ids = torch.LongTensor(anchor_seqs_ids.shape[0],args.num_neg,200)
+    for i,neutral_seq in enumerate(neutral_seqs):
+        neutral_seqs_ids[i] = tokenizer(neutral_seq, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+
+    dataset = TensorDataset(anchor_seqs_ids, pos_seqs_ids, neg_seqs_ids, neutral_seqs_ids)
+    data_loader = DataLoader(dataset=dataset,batch_size=args.batch_size, shuffle=True,num_workers=2)
+
+    return data_loader
+
+    # print("Anchor======",anchor_seqs[0])
+    # print("Pos======",pos_seqs[0])
+    # print("Neg======",neg_seqs[0])
+    # print("Neu======",neutral_seqs[0])
+    # # print(anchor_seqs[0],pos_seqs[0],neg_seqs[0],neutral_seqs[0])
 
 
 
