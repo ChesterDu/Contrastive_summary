@@ -88,18 +88,18 @@ def make_dataloader(args):
         anchor_seqs = anchor_seqs[:args.toy_size]
 
     print("begin to make anchor ids=====")
-    anchor_seqs_ids = tokenizer(anchor_seqs, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+    anchor_seqs_ids = tokenizer(anchor_seqs, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
     print("begin to make pos seqs ids=====")
-    pos_seqs_ids = tokenizer(pos_seqs, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+    pos_seqs_ids = tokenizer(pos_seqs, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
     print("begin to make neg seqs ids=====")
-    neg_seqs_ids = torch.LongTensor(anchor_seqs_ids.shape[0],args.num_neg,200)
+    neg_seqs_ids = torch.LongTensor(anchor_seqs_ids.shape[0],args.num_neg,args.max_len)
     for i,neg_seq in enumerate(neg_seqs):
-        neg_seqs_ids[i] = tokenizer(neg_seq, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+        neg_seqs_ids[i] = tokenizer(neg_seq, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
 
     print("begin to make neg neutral ids=====")
-    neutral_seqs_ids = torch.LongTensor(anchor_seqs_ids.shape[0],args.num_neg,200)
+    neutral_seqs_ids = torch.LongTensor(anchor_seqs_ids.shape[0],args.num_neg,args.max_len)
     for i,neutral_seq in enumerate(neutral_seqs):
-        neutral_seqs_ids[i] = tokenizer(neutral_seq, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+        neutral_seqs_ids[i] = tokenizer(neutral_seq, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
 
     dataset = TensorDataset(anchor_seqs_ids, pos_seqs_ids, neg_seqs_ids, neutral_seqs_ids)
     data_loader = DataLoader(dataset=dataset,batch_size=args.batch_size, shuffle=True,num_workers=2)
