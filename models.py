@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
 import transformers
-import sentence_transformers
+# import sentence_transformers
 import copy
 
 
 class EmbNetwork(nn.Module):
-    def __init__(self, base_model, pooling_strategy="avg"):
+    def __init__(self, base_model, pooling_strategy="avg", use_mlp = False, out_dim = 256):
         super(EmbNetwork, self).__init__()
 
         self.base_model = copy.deepcopy(base_model)

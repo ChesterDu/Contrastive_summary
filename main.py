@@ -67,10 +67,14 @@ if args.distributed:
     torch.distributed.init_process_group(backend='nccl',
                             init_method='env://')
 
+
+ ##make dataset
 train_dataset = data.make_dataset(args)
 train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
 train_loader = DataLoader(train_dataset, num_workers=2,batch_size=args.batch_size, shuffle=True, drop_last=True,  sampler=train_sampler)
 
+base_model = RobertaModel.from_pretrained("roberta-base")
+model = EmbNetwork(base_model, pooling_strategy='last').to(device)
 
 
 # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
