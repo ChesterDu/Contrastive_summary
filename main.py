@@ -14,7 +14,6 @@ import tqdm
 from opt import OpenAIAdam
 from train import train
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '3,4'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--encoder', type=str, default='cnn')
@@ -52,10 +51,10 @@ if args.seed is not None:
     torch.manual_seed(args.seed)
     cudnn.deterministic = True
 
-if torch.cuda.is_available():
-    device = torch.device('cuda')
-else:
-    device = torch.device('cpu')
+#if torch.cuda.is_available():
+    #device = torch.device('cuda')
+#else:
+    #device = torch.device('cpu')
 
 
 if args.local_rank != -1:
@@ -64,13 +63,14 @@ if args.local_rank != -1:
 
     # FOR DISTRIBUTED:  Initialize the backend.  torch.distributed.launch will provide
     # environment variables, and requires that you use init_method=`env://`.
-    torch.distributed.init_process_group(backend="nccl")
+    torch.distributed.init_process_group(backend='nccl', init_method='env://')
+    
 
 
  ##make dataset
 train_dataset = data.make_dataset(args)
 train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-train_loader = DataLoader(train_dataset, num_workers=2,batch_size=args.batch_size, shuffle=True, drop_last=True,  sampler=train_sampler)
+train_loader = DataLoader(train_dataset, num_workers=2,batch_size=args.batch_size, shuffle=False, drop_last=True,  sampler=train_sampler)
 
 ##make model
 base_model = RobertaModel.from_pretrained("roberta-base")
