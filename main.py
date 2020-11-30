@@ -57,25 +57,31 @@ if args.seed is not None:
     #device = torch.device('cpu')
 
 
-if args.local_rank != -1:
-    # FOR DISTRIBUTED:  Set the device according to local_rank.
-    torch.cuda.set_device(args.local_rank)
+# if args.local_rank != -1:
+#     # FOR DISTRIBUTED:  Set the device according to local_rank.
+#     torch.cuda.set_device(args.local_rank)
 
-    # FOR DISTRIBUTED:  Initialize the backend.  torch.distributed.launch will provide
-    # environment variables, and requires that you use init_method=`env://`.
-    torch.distributed.init_process_group(backend='nccl', init_method='env://')
+#     # FOR DISTRIBUTED:  Initialize the backend.  torch.distributed.launch will provide
+#     # environment variables, and requires that you use init_method=`env://`.
+#     torch.distributed.init_process_group(backend='nccl', init_method='env://')
     
 
 
  ##make dataset
-train_dataset = data.make_dataset(args)
-train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-train_loader = DataLoader(train_dataset, num_workers=2,batch_size=args.batch_size, shuffle=False, drop_last=True,  sampler=train_sampler)
+# train_dataset = data.make_dataset(args)
+dataset = torch.load("finetune_dataset.pkl")
+train_dataset = dataset["train"]
+test_dataset = dataset["test"]
+# train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+train_loader = DataLoader(train_dataset, num_workers=2,batch_size=args.batch_size, shuffle=True, drop_last=True)
+test_loader = DataLoader(test_dataset,num_workers=2,batch_size=args.batch_size, shuffle=True, drop_last=True)
+
 
 ##make model
 base_model = RobertaModel.from_pretrained("roberta-base")
 model = EmbNetwork(base_model, pooling_strategy='last').cuda()
-model = torch.nn.parallel.DistributedDataParallel(model,device_ids=[args.local_rank],output_device=args.local_rank)
+# model = torch.nn.parallel.DistributedDataParallel(model,device_ids=[args.local_rank],output_device=args.local_rank)
+model= torch.nn.DataParallel(model)
 
 ##make optimizer
 optimizer = OpenAIAdam(model.parameters(),

@@ -4,7 +4,7 @@ import os
 from transformers import RobertaTokenizer
 from torch.utils.data import TensorDataset, DataLoader
 import tqdm
-from summarizer import make_summarizer
+from summarizer import SummarizerWrap
 import numpy as np
 import random
 
@@ -12,7 +12,7 @@ tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
 
 
 
-def read_all_sequences():
+def read_all_sequences(args):
     seqs = []
     files = os.listdir("dataset/Amazon_few_shot")
     root_dir = "dataset/Amazon_few_shot/"
@@ -28,7 +28,15 @@ def read_all_sequences():
             text = text.strip()
             seqs.append(text)
     random.shuffle(seqs)
+    if args.toy:
+        seqs = seqs[:args.toy_size]
     return seqs
+
+
+def sum_all_sequences(seqs,summarizer):
+    sums = [summarizer.sum_text(x) for x in seqs]
+    return sums
+ 
 
 def create_pos_samples(args, seqs,summarizer):
     print("create pos samples begin====")
@@ -71,21 +79,21 @@ def create_neutual_samples(args, seqs, summarizer):
         np.delete(id_pool,i)
         neutual_ids = np.random.choice(id_pool, args.num_neg, replace=False)
         for id in neutual_ids:
-            neutual.append(summarizer.sum_text(seqs[i] + " " + seqs[id]))
+            neutual.append(summarizer.sum_text(seqs[i]) + " " + summarizer.sum_text(seqs[id]))
         neutual_samples.append(neutual)
 
     return neutual_samples
 
 
-def make_dataset(args):
-    summarizer = make_summarizer(args.summary_method)
+def make_pretrain_dataset(args):
+    summarizer = SummarizerWrap(args.summary_method)
 
-    anchor_seqs = read_all_sequences()
+    anchor_seqs = read_all_sequences(args)
+#     anchor_sums = sum_all_sequences(anchor_seqs,summarizer)
     pos_seqs = create_pos_samples(args, anchor_seqs, summarizer)
     neg_seqs = create_negative_samples(args, anchor_seqs, summarizer)
     neutral_seqs = create_neutual_samples(args, anchor_seqs, summarizer)
-    if args.toy:
-        anchor_seqs = anchor_seqs[:args.toy_size]
+    torch.save({"anchor_seqs":anchor_seqs, "pos_seqs":pos_seqs, "neg_seqs":neg_seqs, "neutral_seqs":neutral_seqs}, "raw_data.pkl")
 
     print("begin to make anchor ids=====")
     anchor_seqs_ids = tokenizer(anchor_seqs, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
