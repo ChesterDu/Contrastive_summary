@@ -23,9 +23,3 @@ class SummarizerWrap():
             out.append(sentence)
             
         return str(out[0])
-       
-    
-    
-summarizer = SummarizerWrap("None")
-text = "If you are writing GPU enabled code, you would typically use a device query to select the desired GPUs. However, a quick and easy solution for testing is to use the environment variable CUDA_VISIBLE_DEVICES to restrict the devices that your CUDA application sees. This can be useful if you are attempting to share resources on a node or you want your GPU enabled executable to target a specific GPU"
-summarizer.sum_text(text)

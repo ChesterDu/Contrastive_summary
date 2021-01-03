@@ -37,7 +37,6 @@ def read_file(path,seqs):
         seqs.append((text,label))
 
 
-
 def read_all_sequences(args):
     train_seqs = []
     test_seqs = []

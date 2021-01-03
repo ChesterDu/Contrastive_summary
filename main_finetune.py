@@ -82,7 +82,7 @@ if args.seed is not None:
     cudnn.deterministic = True
 
 
-dataset = torch.load("finetune_dataset.pkl")
+dataset = torch.load("finetune_data_amazon2.pkl")
 train_dataset = dataset["train"]
 test_dataset = dataset["test"]
 # train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
