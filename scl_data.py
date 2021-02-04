@@ -29,6 +29,7 @@ def summarize(x):
 def make_dataset(args):
     if args.dataset == "amazon_2":
         train_dataset, test_dataset = make_amazon_2_dataset(args)
+        test_dataset = TensorDataset(test_dataset[:200000][0],test_dataset[:200000][1])
     
     return train_dataset, test_dataset
         
@@ -45,7 +46,8 @@ def make_amazon_2_dataset(args):
     random.shuffle(raw_data["test"]["pos"])
     random.shuffle(raw_data["test"]["neg"])
     max_train_num = int(MAX_TRAIN_DATA_NUM_PER_CLASSS * args.percentage)
-    max_test_num = int(MAX_TEST_DATA_NUM_PER_CLASSS * args.percentage)
+    # max_test_num = int(MAX_TEST_DATA_NUM_PER_CLASSS * args.percentage)
+    max_test_num = MAX_TEST_DATA_NUM_PER_CLASSS
     train_seqs = {"pos":raw_data["train"]["pos"][:max_train_num], "neg":raw_data["train"]["neg"][:max_train_num]}
     test_seqs = {"pos":raw_data["test"]["pos"][:max_test_num], "neg":raw_data["test"]["neg"][:max_test_num]}
 
@@ -80,10 +82,10 @@ def make_amazon_2_dataset(args):
             for i in tqdm.tqdm(range(max_num)):
                 x_pos = seqs["pos"][i][0]
                 x_neg = seqs["neg"][i][0]
-                X[i] = tokenizer(x_pos, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
-                X[i+1] = tokenizer(x_neg, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
-                Y[i] = 1
-                Y[i+1] = 0
+                X[i*2] = tokenizer(x_pos, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
+                X[i*2+1] = tokenizer(x_neg, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
+                Y[i*2] = 1
+                Y[i*2+1] = 0
             dataset = TensorDataset(X,Y)
 
         return dataset

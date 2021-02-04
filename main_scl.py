@@ -59,11 +59,43 @@ class Recoder():
         print("scl_loss_semi: ",sum(self.scl_loss_semi)/step)
 
 
-def evaluate_model(model, test_loader, recoder, step):
+
+class Recoder_multi():
+    def __init__(self,args):
+        self.args = args
+        self.ce_loss_x = []
+        self.ce_loss_mix = []
+        self.scl_loss = []
+        self.loss = []
+        self.acc = []
+        self.step = []
+    def log_train(self,ce_loss_x, ce_loss_mix, scl_loss,loss):
+        self.ce_loss_x.append(ce_loss_x.item())
+        self.ce_loss_mix.append(ce_loss_mix.item())
+        self.scl_loss.append(scl_loss.item())
+        self.loss.append(loss.item())
+    
+    def log_test(self,acc,step):
+        self.acc.append(f1)
+        self.step.append(step)
+
+
+    def meter(self,step):
+        print("===================================")
+        print("loss: ",sum(self.loss)/step)
+        print("ce_loss_x: ",sum(self.ce_loss_x)/step)
+        print("ce_loss_mix: ",sum(self.ce_loss_mix)/step)
+        print("scl_loss: ",sum(self.scl_loss)/step)
+
+
+def evaluate_model(model, test_loader, recoder, step, binary = True):
     print("Evaluation Start======")
     model.eval()
     TP, TN, FN, FP = 0, 0, 0, 0
     
+    step = 0
+    bar = tqdm.tqdm(total=len(test_loader))
+    bar.update(0)
     with torch.no_grad():
         for batch in test_loader:
             seq_ids, labels = [item.to(device) for item in batch]
@@ -78,6 +110,10 @@ def evaluate_model(model, test_loader, recoder, step):
             FN += ((prediction == 0) & (labels == 1)).sum().item()
             # FP    predict 1 label 0
             FP += ((prediction == 1) & (labels == 0)).sum().item()
+
+            step += 1
+            # if (step % 40 == 0):
+                # bar.update(40)
 
     # p = TP / (TP + FP)
     # r = TP / (TP + FN)
@@ -107,6 +143,7 @@ parser.add_argument("--seed",type=int,default=41)
 parser.add_argument("--gpu_ids",type=int,default=0)
 parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--eval_batch_size", type=int, default=16)
+parser.add_argument("--num_accum",type=int,default=1)
 parser.add_argument("--max_len",type=int, default=200)
 parser.add_argument('--lr', type=float, default=1e-5)
 parser.add_argument('--clip',type=float,default=1)
@@ -138,7 +175,7 @@ if args.seed is not None:
 train_dataset, test_dataset= scl_data.make_dataset(args)
 
 train_loader = DataLoader(train_dataset, num_workers=2,batch_size=args.batch_size, shuffle=True, drop_last=False)
-test_loader = DataLoader(test_dataset, num_workers=2,batch_size=args.eval_batch_size, shuffle=True, drop_last=False)
+test_loader = DataLoader(test_dataset, num_workers=2,batch_size=args.eval_batch_size, shuffle=True, drop_last=True)
 
 ##make model
 device = torch.device(args.gpu_ids)
@@ -174,22 +211,34 @@ loss_mask_str = args.loss_mask.split(',')
 loss_mask = [float(i) for i in loss_mask_str]
 print(loss_mask)
 
+count = 0
+begin_eval = False
 while(step < args.steps):
     model.train()
     for batch in train_loader:
-        optimizer.zero_grad()
+        # optimizer.zero_grad()
         ce_loss_x, ce_loss_s, ce_loss_semi, scl_loss, scl_loss_semi = model(batch)
         loss = loss_mask[0] * ce_loss_x + loss_mask[1] * ce_loss_s + loss_mask[2] * ce_loss_semi + loss_mask[3] * scl_loss + loss_mask[4] * scl_loss_semi
 
         loss.backward()
-        optimizer.step()
 
-        recoder.log_train(ce_loss_x, ce_loss_s, ce_loss_semi, scl_loss, scl_loss_semi,loss)
-        step += 1
-        if (step % 10 == 0):
-            bar.update(10)
+        count += 1
+        if (count % args.num_accum == 0):
+            optimizer.step()
+            recoder.log_train(ce_loss_x, ce_loss_s, ce_loss_semi, scl_loss, scl_loss_semi,loss)
+            step += 1
+            optimizer.zero_grad()
+
+            if (step % args.log_step == 0):
+                begin_eval = True
+
+            if (step % 10 == 0):
+                bar.update(10)
+
+        # step += 1
         
-        if (step % args.log_step == 0):
+        
+        if begin_eval:
             recoder.meter(step)
             evaluate_model(model,test_loader,recoder,step)
             torch.save(recoder, args.log_dir)
@@ -198,6 +247,7 @@ while(step < args.steps):
                 # best_acc = log["acc"]
                 # torch.save(model.state_dict(),args.model_dir)
             model.train()
+            begin_eval = False
 
 
 
