@@ -8,7 +8,7 @@ from supConloss import SupConLoss
 criterion = nn.CrossEntropyLoss()
 scl_criterion = SupConLoss(temperature=0.3,base_temperature = 0.3)
 
-class RobertaClassificationHead(nn.Module):
+class ClassificationHead(nn.Module):
     """Head for sentence-level classification tasks."""
 
     def __init__(self, config):
@@ -28,12 +28,12 @@ class RobertaClassificationHead(nn.Module):
 
 
 class scl_model(nn.Module):
-    def __init__(self,config,device,pretrained_model,args):
+    def __init__(self,config,device,pretrained_cls,pretrained_enc,args):
         super().__init__()
-        self.cls_x = RobertaClassificationHead(config=config)
-        self.cls_s = RobertaClassificationHead(config=config)
+        self.cls_x = ClassificationHead(config=config)
+        self.cls_s = ClassificationHead(config=config)
 
-        self.f = RobertaModel(config, add_pooling_layer=False)
+        self.f = None
 
         # self.f = RobertaModel(config)
         self.device = device
@@ -41,10 +41,10 @@ class scl_model(nn.Module):
         self.t_pos = args.t_pos
         self.t_mix = args.t_mix
         self.trade_off = args.trade_off
-    def init_weights(self,pretrained_model):
-        self.cls_x = copy.deepcopy(pretrained_model.classifier)
-        self.cls_s = copy.deepcopy(pretrained_model.classifier)
-        self.f = copy.deepcopy(pretrained_model.roberta)
+    def init_weights(self,pretrained_cls,pretrained_enc):
+        self.cls_x = copy.deepcopy(pretrained_cls)
+        self.cls_s = copy.deepcopy(pretrained_cls)
+        self.f = copy.deepcopy(pretrained_enc)
 
     def predict(self,x):
         f_x = self.f(x)[0]
@@ -89,19 +89,21 @@ class scl_model(nn.Module):
         return ce_loss_x, ce_loss_s, ce_loss_semi, scl_loss, scl_loss_semi
 
 class scl_model_multi(nn.Module):
-    def __init__(self,config,device,pretrained_model,with_semi=True):
+    def __init__(self,config,device,pretrained_model,with_semi=True,with_sum=True):
         super().__init__()
-        self.cls_x = RobertaClassificationHead(config=config)
-        self.cls_s = RobertaClassificationHead(config=config)
+        self.cls_x = ClassificationHead(config)
+        self.cls_s = ClassificationHead(config)
         self.mlp_x = nn.Sequential(nn.Linear(config.hidden_size,config.hidden_size),nn.ReLU(),nn.Linear(config.hidden_size,256))
         self.mlp_s = nn.Sequential(nn.Linear(config.hidden_size,config.hidden_size),nn.ReLU(),nn.Linear(config.hidden_size,256))
 
         self.f = RobertaModel(config, add_pooling_layer=False)
+        # self.f = copy.deepcopy(pretrained_enc)
 
         # self.f = RobertaModel(config)
         self.device = device
         self.init_weights(pretrained_model)
         self.with_semi = with_semi
+        self.with_sum = with_sum
     def init_weights(self,pretrained_model):
         self.cls_x = copy.deepcopy(pretrained_model.classifier)
         self.cls_s = copy.deepcopy(pretrained_model.classifier)
@@ -144,15 +146,19 @@ class scl_model_multi(nn.Module):
         z_s = self.mlp_x(f_s[:,0,:]).unsqueeze(1)
 
         # z_s = f_s[:,0,:].unsqueeze(1)
-        
-        z = torch.cat([z_x,z_s],dim=1)
+        if self.with_sum:
+          z = torch.cat([z_x,z_s],dim=1)
+          ucl_loss = scl_criterion(z)
+        else:
+          z = z_x
+          ucl_loss = ce_loss_x # fake
 
         if self.with_semi:
             scl_loss = (scl_criterion(z,labels = y_a) + scl_criterion(z,labels = y_b)) / 2
         else:
             scl_loss = scl_criterion(z,labels = y_a)
 
-        ucl_loss = scl_criterion(z)
+        
 
         return ce_loss_x, ce_loss_s, scl_loss, ucl_loss
 

@@ -100,10 +100,15 @@ class SupConLoss(nn.Module):
         # print("log_prob:",log_prob)
 
         # compute mean of log-likelihood over positive
-        mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1)
+        mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1).clamp(min=0.5)
+        # print(mask)
+        # print("meam_log_prob_pos",mean_log_prob_pos)
+        batch_mask = (mask.sum(1) > 0)
+        # print(batch_mask)
 
         # loss
-        loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
-        loss = loss.view(anchor_count, batch_size).mean()
+        loss = - (self.temperature / self.base_temperature) * (mean_log_prob_pos * batch_mask)
+        loss = torch.sum(loss) / torch.sum(batch_mask).clamp(min=0.5)
+        # loss = loss.view(anchor_count, batch_size).mean()
 
         return loss

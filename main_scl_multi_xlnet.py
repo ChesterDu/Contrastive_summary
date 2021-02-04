@@ -2,17 +2,19 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from copy import deepcopy
-from transformers import RobertaModel, RobertaConfig, RobertaForSequenceClassification
-from scl_multi_data import collate_fn, collate_fn_mixs, multiLabelDataset
+from transformers import XLNetModel, XLNetConfig, XLNetForSequenceClassification
+from scl_multi_data_xlnet import collate_fn, collate_fn_mixs, multiLabelDataset
 from torch.utils.data import TensorDataset, DataLoader
 import argparse
 import random
 import torch.backends.cudnn as cudnn
+import scl_data
 import os
 import tqdm
 from opt import OpenAIAdam
 import tqdm
 from scl_model import scl_model,scl_model_multi
+
 
 class Recoder_multi():
     def __init__(self,args):
@@ -143,14 +145,14 @@ test_loader = DataLoader(test_dataset, num_workers=2, batch_size=args.eval_batch
 
 # ##make model
 device = torch.device(args.gpu_ids)
-config = RobertaConfig.from_pretrained("roberta-base")
+config = XLNetConfig.from_pretrained("xlnet-base-cased")
 config.num_labels = args.num_labels
-pretrained_model = RobertaForSequenceClassification.from_pretrained("roberta-base",config=config)
+pretrained_model = XLNetForSequenceClassification.from_pretrained("xlnet-base-cased",config=config)
 if args.load_pretrain:
-    model = scl_model_multi(config,device,pretrained_model,with_semi=args.with_mix,with_sum = args.with_summary)
+    model = scl_model_multi(config,device,pretrained_model.logits_proj,pretrained_model.transformer,with_semi=args.with_mix,with_sum = args.with_summary)
     model.load_state_dict(torch.load(args.model_dir,map_location="cpu"))
 else:
-    model = scl_model_multi(config,device,pretrained_model,with_semi=args.with_mix,with_sum = args.with_summary)
+    model = scl_model_multi(config,device,pretrained_model.logits_proj,pretrained_model.transformer,with_semi=args.with_mix,with_sum = args.with_summary)
 
 ##make optimizer
 optimizer = OpenAIAdam(model.parameters(),
