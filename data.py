@@ -1,152 +1,45 @@
 import torch
-import torch.nn as nn
-import os
 from transformers import RobertaTokenizer
-from torch.utils.data import TensorDataset, DataLoader
-import tqdm
-from summarizer import SummarizerWrap
-import numpy as np
-import random
-
 tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+class multiLabelDataset(torch.utils.data.Dataset):
+    def __init__(self,raw_data):
+        self.data = raw_data
+
+    def __getitem__(self,index):
+        return self.data[index]
+
+    def __len__(self):
+        return len(self.data)
+        
 
 
+def collate_fn_mix(batch):
+    batch_size = len(batch)
+    perm_index = torch.randperm(batch_size)
+    y_a = torch.LongTensor([item[0] for item in batch])
+    y_b = y_a[perm_index]
+    x = [item[1] for item in batch]
+    s = [item[2] for item in batch]
+    s_perm = [s[perm_index[i]] for i in range(batch_size)]
+    s_mix = [s[i] + "\n" + s_perm[i] for i in range(batch_size)]
 
-def read_all_sequences(args):
-    seqs = []
-    files = os.listdir("dataset/Amazon_few_shot")
-    root_dir = "dataset/Amazon_few_shot/"
-    print("Read all sequences begin=====")
-    for file in tqdm.tqdm(files):
-        if "list" in file:
-            continue
-        path = os.path.join(root_dir, file)
-        with open(path, 'r', encoding='utf-8') as fin:
-            lines = fin.readlines()
-        for line in lines:
-            text, label = line.split("\t")
-            text = text.strip()
-            seqs.append(text)
-    random.shuffle(seqs)
-    if args.toy:
-        seqs = seqs[:args.toy_size]
-    return seqs
+    x_ids = tokenizer(x, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+    s_mix_ids = tokenizer(s_mix, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
 
+    return x_ids, s_mix_ids, y_a, y_b
 
-def sum_all_sequences(seqs,summarizer):
-    sums = [summarizer.sum_text(x) for x in seqs]
-    return sums
- 
+def collate_fn(batch):
+    batch_size = len(batch)
+    perm_index = torch.randperm(batch_size)
+    y_a = torch.LongTensor([item[0] for item in batch])
+    # print(y_a)
+    # print(batch)
+    y_b = y_a[perm_index]
+    x = [item[1] for item in batch]
+    
+    s = [item[2] for item in batch]
 
-def create_pos_samples(args, seqs,summarizer):
-    print("create pos samples begin====")
-    num_iter = len(seqs)
-    if args.toy:
-        num_iter = args.toy_size
-    sums = []
-    for i in tqdm.tqdm(range(num_iter)):
-        sum_seq = summarizer.sum_text(seqs[i])
-        sums.append(sum_seq)
+    x_ids = tokenizer(x, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+    s_ids = tokenizer(s, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
 
-    return sums
-
-def create_negative_samples(args, seqs, summarizer):
-    neg_samples = []
-    print("create neg samples begin====")
-    num_iter = len(seqs)
-    if args.toy:
-        num_iter = args.toy_size
-    for i in tqdm.tqdm(range(num_iter)):
-        neg = []
-        id_pool = np.arange(len(seqs))
-        np.delete(id_pool,i)
-        neg_ids = np.random.choice(id_pool, args.num_neg, replace=False)
-        for id in neg_ids:
-            neg.append(summarizer.sum_text(seqs[id]))
-        neg_samples.append(neg)
-
-    return neg_samples
-
-def create_neutual_samples(args, seqs, summarizer):
-    neutual_samples = []
-    print("create neutual samples begin====")
-    num_iter = len(seqs)
-    if args.toy:
-        num_iter = args.toy_size
-    for i in tqdm.tqdm(range(num_iter)):
-        neutual = []
-        id_pool = np.arange(len(seqs))
-        np.delete(id_pool,i)
-        neutual_ids = np.random.choice(id_pool, args.num_neg, replace=False)
-        for id in neutual_ids:
-            neutual.append(summarizer.sum_text(seqs[i]) + " " + summarizer.sum_text(seqs[id]))
-        neutual_samples.append(neutual)
-
-    return neutual_samples
-
-
-def make_pretrain_dataset(args):
-    summarizer = SummarizerWrap(args.summary_method)
-
-    anchor_seqs = read_all_sequences(args)
-#     anchor_sums = sum_all_sequences(anchor_seqs,summarizer)
-    pos_seqs = create_pos_samples(args, anchor_seqs, summarizer)
-    neg_seqs = create_negative_samples(args, anchor_seqs, summarizer)
-    neutral_seqs = create_neutual_samples(args, anchor_seqs, summarizer)
-    torch.save({"anchor_seqs":anchor_seqs, "pos_seqs":pos_seqs, "neg_seqs":neg_seqs, "neutral_seqs":neutral_seqs}, "raw_data.pkl")
-
-    print("begin to make anchor ids=====")
-    anchor_seqs_ids = tokenizer(anchor_seqs, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
-    print("begin to make pos seqs ids=====")
-    pos_seqs_ids = tokenizer(pos_seqs, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
-    print("begin to make neg seqs ids=====")
-    neg_seqs_ids = torch.LongTensor(anchor_seqs_ids.shape[0],args.num_neg,args.max_len)
-    for i,neg_seq in enumerate(neg_seqs):
-        neg_seqs_ids[i] = tokenizer(neg_seq, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
-
-    print("begin to make neg neutral ids=====")
-    neutral_seqs_ids = torch.LongTensor(anchor_seqs_ids.shape[0],args.num_neg,args.max_len)
-    for i,neutral_seq in enumerate(neutral_seqs):
-        neutral_seqs_ids[i] = tokenizer(neutral_seq, padding = 'max_length', max_length = args.max_len, truncation = True, return_tensors="pt")["input_ids"]
-
-    dataset = TensorDataset(anchor_seqs_ids, pos_seqs_ids, neg_seqs_ids, neutral_seqs_ids)
-    # data_loader = DataLoader(dataset=dataset,batch_size=args.batch_size, shuffle=True,num_workers=2)
-
-    return dataset
-
-    # print("Anchor======",anchor_seqs[0])
-    # print("Pos======",pos_seqs[0])
-    # print("Neg======",neg_seqs[0])
-    # print("Neu======",neutral_seqs[0])
-    # # print(anchor_seqs[0],pos_seqs[0],neg_seqs[0],neutral_seqs[0])
-
-
-
-
-
-     
-
-
-# def make_train_loader(args):
-#     files = os.listdir("dataset/Amazon_few_shot")
-#     root_dir = "dataset/Amazon_few_shot/"
-#     token_ids = []
-#     summarizer = make_summarizer(args.summary_method)
-#     for file in tqdm.tqdm(files):
-#         if "list" in file:
-#             continue
-#         path = os.path.join(root_dir, file)
-#         with open(path, 'r', encoding='utf-8') as fin:
-#             lines = fin.readlines()
-#         for i, line in enumerate(lines):
-#             text, label = line.split("\t")
-#             text = text.strip()
-#             sum_text = summarizer.sum_text(text)
-#             ids = tokenizer.encode(text,padding=True,truncation=True, max_length=200)
-#             sum_ids = tokenizer.encode(sum_text,padding=True,truncation=True, max_length=200)
-#             ids += [1] * (200 - len(ids))
-#             token_ids.append(ids)
-#     dataset = torch.LongTensor(token_ids)
-#     dataset = TensorDataset(dataset)
-#     data_loader = DataLoader(dataset=dataset,batch_size=32, shuffle=True,num_workers=2)
-#     return data_loader
+    return x_ids, s_ids, y_a, y_b

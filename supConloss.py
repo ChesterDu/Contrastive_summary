@@ -1,4 +1,5 @@
 """
+Adapted from:
 Author: Yonglong Tian (yonglong@mit.edu)
 Date: May 07, 2020
 """
@@ -71,12 +72,7 @@ class SupConLoss(nn.Module):
             torch.matmul(torch.norm(anchor_feature,dim = 1,keepdim=True), torch.norm(contrast_feature,dim=1,keepdim = True).T))
         anchor_dot_contrast = torch.div(anchor_dot_contrast, self.temperature)
 
-        # for numerical stability
-        # logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
-        # logits = anchor_dot_contrast - logits_max.detach()
         logits = anchor_dot_contrast
-        # print("labels:",labels)
-        # print("logits:",logits)
 
         # tile mask
         mask = mask.repeat(anchor_count, contrast_count)
@@ -89,22 +85,13 @@ class SupConLoss(nn.Module):
         )
         mask = mask * logits_mask
 
-        # compute log_prob
-        # print("mask:",mask)
-        # print("logits_mask",logits_mask)
         exp_logits = torch.exp(logits) * logits_mask
-        # pos_exp_logits = torch.exp(logits) * mask
-        # print("exp_logits:",torch.exp(logits))
-        # print("logits:",logits)
         log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True))
-        # print("log_prob:",log_prob)
 
         # compute mean of log-likelihood over positive
         mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1).clamp(min=0.5)
-        # print(mask)
-        # print("meam_log_prob_pos",mean_log_prob_pos)
+
         batch_mask = (mask.sum(1) > 0)
-        # print(batch_mask)
 
         # loss
         loss = - (self.temperature / self.base_temperature) * (mean_log_prob_pos * batch_mask)
