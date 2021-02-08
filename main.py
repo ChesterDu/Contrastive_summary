@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from copy import deepcopy
 from transformers import RobertaModel, RobertaConfig, RobertaForSequenceClassification
-from scl_multi_data import collate_fn, collate_fn_mixs, multiLabelDataset
+from data import collate_fn, collate_fn_mixs, multiLabelDataset
 from torch.utils.data import TensorDataset, DataLoader
 import argparse
 import random
@@ -12,7 +12,7 @@ import os
 import tqdm
 from opt import OpenAIAdam
 import tqdm
-from scl_model import scl_model,scl_model_multi
+from model import scl_model
 
 class Recoder_multi():
     def __init__(self,args):
@@ -91,7 +91,6 @@ def get_subset(raw_data, percentage, num_classes):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--steps', type=int, default=10000)
-parser.add_argument("--load_pretrain",action='store_true')
 parser.add_argument("--seed",type=int,default=41)
 parser.add_argument("--gpu_ids",type=int,default=0)
 parser.add_argument("--with_mix", action='store_true')
@@ -101,7 +100,6 @@ parser.add_argument("--num_accum",type=int,default=1)
 parser.add_argument("--max_len",type=int, default=200)
 parser.add_argument('--lr', type=float, default=1e-5)
 parser.add_argument('--clip',type=float,default=1)
-parser.add_argument('--trade_off',type=float,default=0.5)
 parser.add_argument("--lambd",type=float,default=0.8)
 parser.add_argument('--log_step',type=int,default=100)
 parser.add_argument('--log_dir',type=str,default="finetune_log.pkl")
@@ -112,8 +110,6 @@ parser.add_argument('--dataset',type=str,default="amazon_2")
 parser.add_argument('--percentage',type=float,default=0.01)
 parser.add_argument('--with_summary',action='store_true')
 parser.add_argument('--num_labels',type=int,default=5)
-
-parser.add_argument('--loss_mask',type=str,default = "1,1,1,1,1")
 
 args = parser.parse_args()
 
@@ -146,11 +142,7 @@ device = torch.device(args.gpu_ids)
 config = RobertaConfig.from_pretrained("roberta-base")
 config.num_labels = args.num_labels
 pretrained_model = RobertaForSequenceClassification.from_pretrained("roberta-base",config=config)
-if args.load_pretrain:
-    model = scl_model_multi(config,device,pretrained_model,with_semi=args.with_mix,with_sum = args.with_summary)
-    model.load_state_dict(torch.load(args.model_dir,map_location="cpu"))
-else:
-    model = scl_model_multi(config,device,pretrained_model,with_semi=args.with_mix,with_sum = args.with_summary)
+model = scl_model(config,device,pretrained_model,with_semi=args.with_mix,with_sum = args.with_summary)
 
 ##make optimizer
 optimizer = OpenAIAdam(model.parameters(),
@@ -174,9 +166,6 @@ bar = tqdm.tqdm(total=args.steps)
 bar.update(0)
 best_acc = 0
 recoder = Recoder_multi(args)
-loss_mask_str = args.loss_mask.split(',')
-loss_mask = [float(i) for i in loss_mask_str]
-print(loss_mask)
 
 best_loss = float('inf')
 count = 0
@@ -186,10 +175,10 @@ while(step < args.steps):
     for batch in train_loader:
         # optimizer.zero_grad()
         # print(batch)
-        ce_loss_x, ce_loss_s, scl_loss, ucl_loss = model(batch)
-        loss = loss_mask[0] * ce_loss_x + loss_mask[1] * ce_loss_s + loss_mask[2] * scl_loss + loss_mask[3] * ucl_loss
+        ce_loss_x, ce_loss_s, scl_loss = model(batch)
+        loss = args.lambd * (ce_loss_x + ce_loss_s)/2 + (1-args.lambd) * scl_loss
 
-        # print(ce_loss_x, ce_loss_s, scl_loss, ucl_loss)
+        # print(ce_loss_x, ce_loss_s, scl_loss)
         loss.backward()
 
         count += 1
@@ -215,13 +204,6 @@ while(step < args.steps):
             recoder.meter(step)
             evaluate_model(model,test_loader,recoder,step)
             torch.save(recoder, args.log_dir)
-            
-            # if (log["acc"] > best_acc):
-            #     best_acc = log["acc"]
-            #     torch.save(model.state_dict(),args.model_dir)
-            # if sum(recoder.loss) / step < best_loss:
-            #     torch.save(model.state_dict(),args.model_dir)
-            #     best_loss = sum(recoder.loss) / step
 
             model.train()
             begin_eval = False

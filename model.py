@@ -23,7 +23,7 @@ class ClassificationHead(nn.Module):
         x = self.out_proj(x)
         return x
 
-class scl_model_multi(nn.Module):
+class scl_model(nn.Module):
     def __init__(self,config,device,pretrained_model,with_semi=True,with_sum=True):
         super().__init__()
         self.cls_x = ClassificationHead(config)

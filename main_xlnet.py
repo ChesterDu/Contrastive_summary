@@ -12,7 +12,7 @@ import os
 import tqdm
 from opt import OpenAIAdam
 import tqdm
-from scl_model import scl_model_multi
+from model import scl_model
 
 
 class Recoder_multi():
@@ -139,13 +139,7 @@ test_loader = DataLoader(test_dataset, num_workers=2, batch_size=args.eval_batch
 device = torch.device(args.gpu_ids)
 config = XLNetConfig.from_pretrained("xlnet-base-cased")
 config.num_labels = args.num_labels
-pretrained_model = XLNetForSequenceClassification.from_pretrained("xlnet-base-cased",config=config)
-if args.load_pretrain:
-    model = scl_model_multi(config,device,pretrained_model.logits_proj,pretrained_model.transformer,with_semi=args.with_mix,with_sum = args.with_summary)
-    model.load_state_dict(torch.load(args.model_dir,map_location="cpu"))
-else:
-    model = scl_model_multi(config,device,pretrained_model.logits_proj,pretrained_model.transformer,with_semi=args.with_mix,with_sum = args.with_summary)
-
+model = XLNetForSequenceClassification.from_pretrained("xlnet-base-cased",config=config)
 ##make optimizer
 optimizer = OpenAIAdam(model.parameters(),
                                   lr=args.lr,
@@ -178,8 +172,6 @@ begin_eval = False
 while(step < args.steps):
     model.train()
     for batch in train_loader:
-        # optimizer.zero_grad()
-        # print(batch)
         ce_loss_x, ce_loss_s, scl_loss, ucl_loss = model(batch)
         loss = loss_mask[0] * ce_loss_x + loss_mask[1] * ce_loss_s + loss_mask[2] * scl_loss + loss_mask[3] * ucl_loss
 
@@ -201,21 +193,12 @@ while(step < args.steps):
 
             if (step % 10 == 0):
                 bar.update(10)
-
-        # step += 1
         
         
         if begin_eval:
             recoder.meter(step)
             evaluate_model(model,test_loader,recoder,step)
             torch.save(recoder, args.log_dir)
-            
-            # if (log["acc"] > best_acc):
-            #     best_acc = log["acc"]
-            #     torch.save(model.state_dict(),args.model_dir)
-            # if sum(recoder.loss) / step < best_loss:
-            #     torch.save(model.state_dict(),args.model_dir)
-            #     best_loss = sum(recoder.loss) / step
 
             model.train()
             begin_eval = False
