@@ -11,17 +11,17 @@ fi
 
 if test $1 = "amazon" 
 then
-    url=amazon_url
+    url=${amazon_url}
 fi
 
 if test $1 = "yelp" 
 then
-    url=yelp_url
+    url=${yelp_url}
 fi
 
 if test $1 = "ag_news" 
 then
-    url=ag_news_url
+    url=${ag_news_url}
 fi
 
 curl "${url}" -o "${dataset_dir}/$1.tgz"
