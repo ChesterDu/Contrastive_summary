@@ -1,0 +1,9 @@
+torch==1.7.0
+transformers==4.2.2
+nltk==3.2.5
+summy==0.8.1
+sentencepiece==0.1.95
+multiprocess==0.70.9
+pyrouge==0.1.3
+pytorch-transformers==1.2.0
+tensorboardX==1.9
