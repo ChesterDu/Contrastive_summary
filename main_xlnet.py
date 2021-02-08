@@ -3,17 +3,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 from copy import deepcopy
 from transformers import XLNetModel, XLNetConfig, XLNetForSequenceClassification
-from scl_multi_data_xlnet import collate_fn, collate_fn_mixs, multiLabelDataset
+from data_xlnet import collate_fn, collate_fn_mixs, multiLabelDataset
 from torch.utils.data import TensorDataset, DataLoader
 import argparse
 import random
 import torch.backends.cudnn as cudnn
-import scl_data
 import os
 import tqdm
 from opt import OpenAIAdam
 import tqdm
-from scl_model import scl_model,scl_model_multi
+from scl_model import scl_model_multi
 
 
 class Recoder_multi():
@@ -93,29 +92,22 @@ def get_subset(raw_data, percentage, num_classes):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--steps', type=int, default=10000)
-parser.add_argument("--load_pretrain",action='store_true')
 parser.add_argument("--seed",type=int,default=41)
 parser.add_argument("--gpu_ids",type=int,default=0)
-parser.add_argument("--with_mix", action='store_true')
 parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--eval_batch_size", type=int, default=16)
-parser.add_argument("--num_accum",type=int,default=1)
-parser.add_argument("--max_len",type=int, default=200)
 parser.add_argument('--lr', type=float, default=1e-5)
 parser.add_argument('--clip',type=float,default=1)
-parser.add_argument('--trade_off',type=float,default=0.5)
 parser.add_argument("--lambd",type=float,default=0.8)
 parser.add_argument('--log_step',type=int,default=100)
 parser.add_argument('--log_dir',type=str,default="finetune_log.pkl")
 parser.add_argument('--model_dir',type=str,default="finetune_model.pkl")
 
 parser.add_argument('--dataset_pth',type=str,default="none")
-parser.add_argument('--dataset',type=str,default="amazon_2")
 parser.add_argument('--percentage',type=float,default=0.01)
 parser.add_argument('--with_summary',action='store_true')
+parser.add_argument("--with_mix", action='store_true')
 parser.add_argument('--num_labels',type=int,default=5)
-
-parser.add_argument('--loss_mask',type=str,default = "1,1,1,1,1")
 
 args = parser.parse_args()
 
