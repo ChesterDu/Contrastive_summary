@@ -12,7 +12,6 @@ import os
 import tqdm
 from opt import OpenAIAdam
 import tqdm
-from model import scl_model
 
 
 class Recoder_multi():
@@ -63,7 +62,7 @@ def evaluate_model(model, test_loader, recoder, step):
             x_ids, s_mix_ids, y_a, y_b = batch
             seq_ids = x_ids.to(device)
             labels = y_a.to(device)
-            logits = model.predict(seq_ids)
+            logits = model(input_ids=seq_ids,labels=labels)[1]
 
             prediction = torch.argmax(logits, dim = 1)
             correct += (prediction == labels).sum().item()
@@ -172,9 +171,10 @@ begin_eval = False
 while(step < args.steps):
     model.train()
     for batch in train_loader:
-        ce_loss_x, ce_loss_s, scl_loss, ucl_loss = model(batch)
-        loss = loss_mask[0] * ce_loss_x + loss_mask[1] * ce_loss_s + loss_mask[2] * scl_loss + loss_mask[3] * ucl_loss
-
+        x_ids, s_mix_ids, y_a, y_b = batch
+        seq_ids = x_ids.to(device)
+        labels = y_a.to(device)
+        loss = model(input_ids=seq_ids,labels=labels)[0]
         # print(ce_loss_x, ce_loss_s, scl_loss, ucl_loss)
         loss.backward()
 
