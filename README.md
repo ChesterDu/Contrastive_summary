@@ -21,3 +21,17 @@ git clone https://github.com/nlpyang/PreSumm.git PreSumm
 ```
 Then **switch to the dev branch** and download pretrained models(Liu and Lapata) from [google drive](https://drive.google.com/file/d/1-IKVCtc4Q-BdZpjXc4s70_fRsWnjtYLr/view). Unzip the downloaed file and **move `.pt` file to `PreSumm/models`**
 
+## Dataset
+### step1: get raw dataset
+You can choose `$dataset` among  `[amazon,yelp,ag_news]`
+```
+sh scripts/get_raw_dataset.sh $dataset
+```
+The raw dataset will be downloaded to `./raw_datasets/$dataset`
+### step2: process data
+```
+sh scripts/process_data.sh /path/to/dataset
+```
+This step will generate summary of the raw data and make processed dataset
+
+
