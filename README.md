@@ -15,20 +15,20 @@ tensorboardX==1.9
 ```
 We use [PreSumm(Liu and Lapata)](https://arxiv.org/abs/1908.08345) to generate abstractive summary. The summary generation code and pretrained models can be checked out [here](https://github.com/nlpyang/PreSumm/tree/master).
 
-Clone the repo by:
+Clone the **PreSumm repo** by:
 ```
 git clone https://github.com/nlpyang/PreSumm.git PreSumm
 ```
-Then **switch to the dev branch** and download pretrained models(Liu and Lapata) from [google drive](https://drive.google.com/file/d/1-IKVCtc4Q-BdZpjXc4s70_fRsWnjtYLr/view). Unzip the downloaed file and **move `.pt` file to `PreSumm/models`**
+Then **switch to the dev branch in PreSumm repo** and download pretrained models(Liu and Lapata) from [google drive](https://drive.google.com/file/d/1-IKVCtc4Q-BdZpjXc4s70_fRsWnjtYLr/view). Unzip the downloaed file and **move `.pt` file to `./PreSumm/models`**
 
 ## Dataset
-### step1: get raw dataset
+### step1: Download raw dataset
 You can choose `$dataset` among  `[amazon,yelp,ag_news]`
 ```
 sh scripts/get_raw_dataset.sh $dataset
 ```
 The raw dataset will be downloaded to `./raw_datasets/$dataset`
-### step2: process data
+### step2: Process Data
 ```
 sh scripts/process_data.sh /path/to/dataset
 ```
