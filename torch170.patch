@@ -1,0 +1,49 @@
+diff -r -C 4 src/models/predictor.py src_modified/models/predictor.py
+*** src/models/predictor.py	2021-02-13 11:15:16.000000000 +0000
+--- src_modified/models/predictor.py	2021-02-13 11:16:38.000000000 +0000
+***************
+*** 326,334 ****
+              select_indices = batch_index.view(-1)
+  
+              # Append last prediction.
+              alive_seq = torch.cat(
+!                 [alive_seq.index_select(0, select_indices),
+                   topk_ids.view(-1, 1)], -1)
+  
+              is_finished = topk_ids.eq(self.end_token)
+              if step + 1 == max_length:
+--- 326,334 ----
+              select_indices = batch_index.view(-1)
+  
+              # Append last prediction.
+              alive_seq = torch.cat(
+!                 [alive_seq.index_select(0, select_indices.long()),
+                   topk_ids.view(-1, 1)], -1)
+  
+              is_finished = topk_ids.eq(self.end_token)
+              if step + 1 == max_length:
+***************
+*** 367,377 ****
+                  alive_seq = predictions.index_select(0, non_finished) \
+                      .view(-1, alive_seq.size(-1))
+              # Reorder states.
+              select_indices = batch_index.view(-1)
+!             src_features = src_features.index_select(0, select_indices)
+              dec_states.map_batch_fn(
+!                 lambda state, dim: state.index_select(dim, select_indices)
+  
+          return results
+  
+  
+--- 367,377 ----
+                  alive_seq = predictions.index_select(0, non_finished) \
+                      .view(-1, alive_seq.size(-1))
+              # Reorder states.
+              select_indices = batch_index.view(-1)
+!             src_features = src_features.index_select(0, select_indices.long())
+              dec_states.map_batch_fn(
+!                 lambda state, dim: state.index_select(dim, select_indices.long()))
+  
+          return results
+  
+  
