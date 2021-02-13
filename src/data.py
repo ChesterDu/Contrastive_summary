@@ -1,9 +1,46 @@
 import torch
 from transformers import RobertaTokenizer
+from summarizer import summarize
 tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+import random
 class multiLabelDataset(torch.utils.data.Dataset):
-    def __init__(self,raw_data):
-        self.data = raw_data
+    def __init__(self,dataset_name,max_num,seed=41,split="train"):
+        random.seed(seed)
+        num_labels = 5
+        if dataset_name is "ag_news":
+          num_labels = 4
+
+        num_per_class = int(max_num / num_labels)
+        if split is "test":
+          num_per_class = int(10000 / num_labels)
+        
+
+        temp = {i:[] for i in range(num_labels)}
+        with open ("../processed_data/" + dataset_name + "/" + split + "/data") as fin:
+          text = fin.readlines()
+
+        labels = torch.load("../processed_data/" + dataset_name + "/" + split + "/labels")
+
+        with open ("../processed_data/" + dataset_name + "/train/summary") as fin:
+          summary = fin.readlines()
+        
+        if split is "test":
+          summary = text
+
+        for i in range(len(text)):
+          x,y,s = text[i].strip(),labels[i],summary[i].strip()
+          if split is "train":
+            s = s.replace("<q>",". ")
+            if "....." in s or "this this this" in s or "is is is" in s:
+              s = summarize(text)
+
+          temp[y].append((y,x,s))
+        
+        self.data = []
+        for i in range(num_labels):
+          random.shuffle(temp[i])
+          self.data += temp[i][:num_per_class]
+        random.shuffle(self.data)
 
     def __getitem__(self,index):
         return self.data[index]

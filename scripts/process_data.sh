@@ -18,4 +18,4 @@ echo "==========================="
 cd PreSumm/src
 python train.py -task abs -mode test_text -batch_size 100 -test_batch_size 100 -text_src ../raw_data/"$dataset".txt -test_from ../models/model_step_148000.pt -visible_gpus 0 -result_path ../results/"$dataset" -log_file ../logs/"$dataset".log
 cd ../..
-cp "PreSumm/results/${dataset}.-1.candidate" "processed_data/${dataset}/train_summary"
+cp "PreSumm/results/${dataset}.-1.candidate" "processed_data/${dataset}/train/summary"

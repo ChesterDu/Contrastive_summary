@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from copy import deepcopy
 from transformers import RobertaModel, RobertaConfig, RobertaForSequenceClassification
-from data import collate_fn, collate_fn_mixs, multiLabelDataset
+from data import collate_fn, collate_fn_mix, multiLabelDataset
 from torch.utils.data import TensorDataset, DataLoader
 import argparse
 import random
@@ -20,15 +20,13 @@ class Recoder_multi():
         self.ce_loss_x = []
         self.ce_loss_s = []
         self.scl_loss = []
-        self.ucl_loss = []
         self.loss = []
         self.acc = []
         self.step = []
-    def log_train(self,ce_loss_x, ce_loss_s, scl_loss, ucl_loss, loss):
+    def log_train(self,ce_loss_x, ce_loss_s, scl_loss, loss):
         self.ce_loss_x.append(ce_loss_x.item())
         self.ce_loss_s.append(ce_loss_s.item())
         self.scl_loss.append(scl_loss.item())
-        self.ucl_loss.append(ucl_loss.item())
         self.loss.append(loss.item())
     
     def log_test(self,acc,step):
@@ -44,7 +42,6 @@ class Recoder_multi():
         print("ce_loss_x: ",sum(self.ce_loss_x[st:ed])/self.args.log_step)
         print("ce_loss_s: ",sum(self.ce_loss_s[st:ed])/self.args.log_step)
         print("scl_loss: ",sum(self.scl_loss[st:ed])/self.args.log_step)
-        print("ucl_loss: ",sum(self.ucl_loss[st:ed])/self.args.log_step)
     
 
 
@@ -73,21 +70,6 @@ def evaluate_model(model, test_loader, recoder, step):
 
     recoder.log_test(acc,step)
 
-def get_subset(raw_data, percentage, num_classes):
-  tmp = {i:[] for i in range(num_classes)}
-  full_len = len(raw_data) / num_classes
-  for item in raw_data:
-    label = item[0]
-    tmp[label].append(item)
-  
-  subset = []
-  for label in range(num_classes):
-    random.shuffle(tmp[label])
-    subset += tmp[label][:int(full_len * percentage)]
-  
-  random.shuffle(subset)
-  return subset
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--steps', type=int, default=10000)
@@ -103,13 +85,10 @@ parser.add_argument('--clip',type=float,default=1)
 parser.add_argument("--lambd",type=float,default=0.8)
 parser.add_argument('--log_step',type=int,default=100)
 parser.add_argument('--log_dir',type=str,default="finetune_log.pkl")
-parser.add_argument('--model_dir',type=str,default="finetune_model.pkl")
 
-parser.add_argument('--dataset_pth',type=str,default="none")
 parser.add_argument('--dataset',type=str,default="amazon_2")
-parser.add_argument('--percentage',type=float,default=0.01)
+parser.add_argument('--train_num',type=float,default=80)
 parser.add_argument('--with_summary',action='store_true')
-parser.add_argument('--num_labels',type=int,default=5)
 
 args = parser.parse_args()
 
@@ -119,19 +98,12 @@ if args.seed is not None:
     torch.manual_seed(args.seed)
     cudnn.deterministic = True
 
-if args.dataset_pth != "none":
-    raw_data = torch.load(args.dataset_pth)
-    raw_train_data = raw_data["train"]
-    raw_test_data = raw_data["test"]
-
-random.shuffle(raw_train_data)
-train_num = int(args.percentage * len(raw_train_data))
-print("train num:",train_num)
-train_dataset = multiLabelDataset(get_subset(raw_train_data, args.percentage, args.num_labels))
-test_dataset = multiLabelDataset(raw_test_data)
+# Make Dataset
+train_dataset = multiLabelDataset(dataset_name = args.dataset,max_num=args.train_num,seed=args.seed,split="train")
+test_dataset = multiLabelDataset(dataset_name = args.dataset,max_num=10000,seed=args.seed,split="test")
 
 if args.with_mix:
-    my_collect = collate_fn_mixs
+    my_collect = collate_fn_mix
 else:
     my_collect = collate_fn
 train_loader = DataLoader(train_dataset, num_workers=2, batch_size=args.batch_size, shuffle=True, collate_fn = my_collect)
@@ -140,7 +112,9 @@ test_loader = DataLoader(test_dataset, num_workers=2, batch_size=args.eval_batch
 # ##make model
 device = torch.device(args.gpu_ids)
 config = RobertaConfig.from_pretrained("roberta-base")
-config.num_labels = args.num_labels
+config.num_labels = 5
+if args.dataset is "ag_news":
+  config.num_labels = 4
 pretrained_model = RobertaForSequenceClassification.from_pretrained("roberta-base",config=config)
 model = scl_model(config,device,pretrained_model,with_semi=args.with_mix,with_sum = args.with_summary)
 
@@ -184,7 +158,7 @@ while(step < args.steps):
         count += 1
         if (count % args.num_accum == 0):
             optimizer.step()
-            recoder.log_train(ce_loss_x, ce_loss_s, scl_loss,ucl_loss,loss)
+            recoder.log_train(ce_loss_x, ce_loss_s, scl_loss,loss)
             step += 1
             optimizer.zero_grad()
 
@@ -203,7 +177,7 @@ while(step < args.steps):
         if begin_eval:
             recoder.meter(step)
             evaluate_model(model,test_loader,recoder,step)
-            torch.save(recoder, args.log_dir)
+            torch.save(recoder, "../" + args.log_dir)
 
             model.train()
             begin_eval = False
