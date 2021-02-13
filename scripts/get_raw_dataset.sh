@@ -12,18 +12,25 @@ fi
 if test $1 = "amazon" 
 then
     url=${amazon_url}
+    orig_dir="${dataset_dir}/amazon_review_full_csv"
+    dir="${dataset_dir}/amazon"
 fi
 
 if test $1 = "yelp" 
 then
     url=${yelp_url}
+    orig_dir="${dataset_dir}/yelp_review_full_csv"
+    dir="${dataset_dir}/yelp"
 fi
 
 if test $1 = "ag_news" 
 then
     url=${ag_news_url}
+    orig_dir="${dataset_dir}/ag_news_csv"
+    dir="${dataset_dir}/ag_news"
 fi
 
 curl "${url}" -o "${dataset_dir}/$1.tgz"
 tar -xvf "${dataset_dir}/$1.tgz" -C "${dataset_dir}"
 rm "${dataset_dir}/$1.tgz"
+mv $orig_dir $dir
