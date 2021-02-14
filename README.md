@@ -74,5 +74,6 @@ python main_xlnet.py --dataset $dataset \
                --log_dir log.pkl \
                --train_num 80 ./
 ```
+You can check the test accuracy of each checkpoint by reading `log.pkl`. Best test accuracy is reported.
 
 
