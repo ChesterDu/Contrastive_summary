@@ -150,7 +150,10 @@ while(step < args.steps):
         # optimizer.zero_grad()
         # print(batch)
         ce_loss_x, ce_loss_s, scl_loss = model(batch)
-        loss = args.lambd * (ce_loss_x + ce_loss_s)/2 + (1-args.lambd) * scl_loss
+        ce_loss = (ce_loss_x + ce_loss_s)/2
+        if not args.with_summary:
+            ce_loss = ce_loss_x
+        loss = args.lambd * ce_loss+ (1-args.lambd) * scl_loss
 
         # print(ce_loss_x, ce_loss_s, scl_loss)
         loss.backward()

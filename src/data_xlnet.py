@@ -1,19 +1,8 @@
 import torch
 from transformers import XLNetTokenizer
 tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
-class multiLabelDataset(torch.utils.data.Dataset):
-    def __init__(self,raw_data):
-        self.data = raw_data
 
-    def __getitem__(self,index):
-        return self.data[index]
-
-    def __len__(self):
-        return len(self.data)
-        
-
-
-def collate_fn_mixs(batch):
+def collate_fn_mix(batch):
     batch_size = len(batch)
     perm_index = torch.randperm(batch_size)
     y_a = torch.LongTensor([item[0] for item in batch])
