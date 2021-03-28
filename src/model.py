@@ -102,12 +102,12 @@ class scl_model(nn.Module):
 class scl_model_Xlnet(nn.Module):
     def __init__(self,config,device,pretrained_model,with_semi=True,with_sum=True):
         super().__init__()
-        self.cls_x = ClassificationHead(config)
-        self.cls_s = ClassificationHead(config)
+        self.cls_x = None
+        self.cls_s = None
         self.mlp_x = nn.Sequential(nn.Linear(config.hidden_size,config.hidden_size),nn.ReLU(),nn.Linear(config.hidden_size,256))
         self.mlp_s = nn.Sequential(nn.Linear(config.hidden_size,config.hidden_size),nn.ReLU(),nn.Linear(config.hidden_size,256))
 
-        self.f = XLNetModel(config, add_pooling_layer=False)
+        self.f = XLNetModel(config)
         self.scl_criterion = SupConLoss(temperature=0.3,base_temperature = 0.3)
         self.ce_criterion = nn.CrossEntropyLoss()
         # self.f = copy.deepcopy(pretrained_enc)
@@ -133,16 +133,16 @@ class scl_model_Xlnet(nn.Module):
 
     def predict(self,x):
         f_x = self.f(x)[0]
-        score = self.cls_x(f_x)
+        score = self.cls_x(f_x[:,0,:])
         return score
     def forward(self,batch):
         x,s_mix,y_a,y_b = [item.to(self.device) for item in batch]
         f_x = self.f(x)[0]
         f_s = self.f(s_mix)[0]
 
-        p_x = self.cls_x(f_x)
+        p_x = self.cls_x(f_x[:,0,:])
         # p_s = self.cls_s(f_s)
-        p_s = self.cls_x(f_s)
+        p_s = self.cls_x(f_s[:,0,:])
         
         # print(p_x.shape)
         # print(y_a.shape)
