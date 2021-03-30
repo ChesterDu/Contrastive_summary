@@ -85,7 +85,7 @@ parser.add_argument('--lr', type=float, default=1e-5)
 parser.add_argument('--clip',type=float,default=1)
 parser.add_argument("--lambd",type=float,default=0.8)
 parser.add_argument('--log_step',type=int,default=100)
-parser.add_argument('--log_dir',type=str,default="finetune_log.pkl")
+# parser.add_argument('--log_dir',type=str,default="finetune_log.pkl")
 
 parser.add_argument('--dataset',type=str,default="amazon_2")
 parser.add_argument('--train_num',type=float,default=80)
@@ -145,6 +145,17 @@ recoder = Recoder_multi(args)
 best_loss = float('inf')
 count = 0
 begin_eval = False
+
+log_name = ""
+if args.with_mix:
+  log_name += "with_mix_"
+if args.with_summary:
+  log_name += "with_summary_"
+log_name += args.dataset
+log_name += str(int(args.train_num)) + "_"
+log_name += str(args.lambd) + ".pkl"
+
+print(log_name)
 while(step < args.steps):
     model.train()
     for batch in train_loader:
@@ -181,7 +192,7 @@ while(step < args.steps):
         if begin_eval:
             recoder.meter(step)
             evaluate_model(model,test_loader,recoder,step)
-            torch.save(recoder, "../" + args.log_dir)
+            torch.save(recoder, "../" + log_name)
 
             model.train()
             begin_eval = False

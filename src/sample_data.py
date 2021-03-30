@@ -17,12 +17,13 @@ train_data_np = train_pd.values
 random.shuffle(train_data_np)
 num_labels = 5
 size = 16
-if dataset is "ag_news":
+if dataset == "ag_news":
+  print(dataset)
   num_labels = 4
   size = 20
 lines = {i:[] for i in range(num_labels)}
 for line in train_data_np:
-  text = line[1]
+  text = line[2]
   text = text.strip()
   text = text.replace("\n"," ")
   text += "\n"
@@ -50,7 +51,7 @@ if dataset is "ag_news":
   size = 2500
 lines = {i:[] for i in range(num_labels)}
 for line in test_data_np:
-  text = line[1]
+  text = line[2]
   text = text.strip()
   text = text.replace("\n"," ")
   text += "\n"
