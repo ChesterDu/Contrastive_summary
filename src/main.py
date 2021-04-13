@@ -3,7 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from copy import deepcopy
 from transformers import RobertaModel, RobertaConfig, RobertaForSequenceClassification
-from data import collate_fn, collate_fn_mix, multiLabelDataset
+from transformers import BertModel, BertConfig, BertForSequenceClassification
+from transformers import XLNetModel, XLNetConfig, XLNetForSequenceClassification
+from data import collate_fn, collate_fn_mix, multiLabelDataset, make_tokenizer
 from torch.utils.data import TensorDataset, DataLoader
 import argparse
 import random
@@ -12,7 +14,7 @@ import os
 import tqdm
 from opt import OpenAIAdam
 import tqdm
-from model import scl_model
+from model import make_model
 
 class Recoder_multi():
     def __init__(self,args):
@@ -56,7 +58,9 @@ def evaluate_model(model, test_loader, recoder, step):
     total = 0
     with torch.no_grad():
         for batch in test_loader:
-            x_ids, s_mix_ids, y_a, y_b = batch
+            x, s_mix, y_a, y_b = batch
+            x_ids = tokenizer(x, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+            # s_ids = tokenizer(s, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
             seq_ids = x_ids.to(device)
             labels = y_a.to(device)
             logits = model.predict(seq_ids)
@@ -75,6 +79,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--steps', type=int, default=10000)
 parser.add_argument("--seed",type=int,default=41)
 parser.add_argument("--gpu_ids",type=int,default=0)
+parser.add_argument("--aug_methods",type=str,default='summary')
 parser.add_argument("--with_mix", action='store_true')
 parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--eval_batch_size", type=int, default=16)
@@ -84,9 +89,10 @@ parser.add_argument('--lr', type=float, default=1e-5)
 parser.add_argument('--clip',type=float,default=1)
 parser.add_argument("--lambd",type=float,default=0.8)
 parser.add_argument('--log_step',type=int,default=100)
-parser.add_argument('--log_dir',type=str,default="finetune_log.pkl")
+# parser.add_argument('--log_dir',type=str,default="finetune_log.pkl")
+parser.add_argument("--model",type=str,default="xlnet")
 
-parser.add_argument('--dataset',type=str,default="amazon_2")
+parser.add_argument('--dataset',type=str,default="amazon")
 parser.add_argument('--train_num',type=float,default=80)
 parser.add_argument('--with_summary',action='store_true')
 
@@ -99,8 +105,8 @@ if args.seed is not None:
     cudnn.deterministic = True
 
 # Make Dataset
-train_dataset = multiLabelDataset(dataset_name = args.dataset,max_num=args.train_num,seed=args.seed,split="train")
-test_dataset = multiLabelDataset(dataset_name = args.dataset,max_num=10000,seed=args.seed,split="test")
+train_dataset = multiLabelDataset(dataset_name = args.dataset,max_num=args.train_num,seed=args.seed,split="train",aug_methods = args.aug_methods)
+test_dataset = multiLabelDataset(dataset_name = args.dataset,max_num=10000,seed=args.seed,split="test",aug_methods = args.aug_methods)
 
 if args.with_mix:
     my_collect = collate_fn_mix
@@ -109,14 +115,14 @@ else:
 train_loader = DataLoader(train_dataset, num_workers=2, batch_size=args.batch_size, shuffle=True, collate_fn = my_collect)
 test_loader = DataLoader(test_dataset, num_workers=2, batch_size=args.eval_batch_size,shuffle=False,collate_fn=my_collect)
 
-# ##make model
+# make tokenizer
+tokenizer = make_tokenizer(args)
+
+
+# make model
 device = torch.device(args.gpu_ids)
-config = RobertaConfig.from_pretrained("roberta-base")
-config.num_labels = 5
-if args.dataset is "ag_news":
-  config.num_labels = 4
-pretrained_model = RobertaForSequenceClassification.from_pretrained("roberta-base",config=config)
-model = scl_model(config,device,pretrained_model,with_semi=args.with_mix,with_sum = args.with_summary)
+model = make_model(args,device)
+model = model.to(device)
 
 ##make optimizer
 optimizer = OpenAIAdam(model.parameters(),
@@ -133,7 +139,7 @@ optimizer = OpenAIAdam(model.parameters(),
 
 # critirion = torch.nn.CrossEntropyLoss()
 
-model = model.to(device)
+
 
 step = 0
 bar = tqdm.tqdm(total=args.steps)
@@ -144,11 +150,26 @@ recoder = Recoder_multi(args)
 best_loss = float('inf')
 count = 0
 begin_eval = False
+
+log_name = args.model + "_" + args.aug_methods + "_"
+if args.with_mix:
+  log_name += "with_mix_"
+if args.with_summary:
+  log_name += "with_summary_"
+log_name += args.dataset
+log_name += str(int(args.train_num)) + "_"
+log_name += str(args.lambd) + ".pkl"
+
+print(log_name)
 while(step < args.steps):
     model.train()
-    for batch in train_loader:
-        # optimizer.zero_grad()
+    for x,s,y_a,y_b in train_loader:
         # print(batch)
+        x_ids = tokenizer(x, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+        s_ids = tokenizer(s, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+        # print(x_ids)
+        batch = [x_ids,s_ids,y_a,y_b]
+
         ce_loss_x, ce_loss_s, scl_loss = model(batch)
         ce_loss = (ce_loss_x + ce_loss_s)/2
         if not args.with_summary:
@@ -180,7 +201,7 @@ while(step < args.steps):
         if begin_eval:
             recoder.meter(step)
             evaluate_model(model,test_loader,recoder,step)
-            torch.save(recoder, "../" + args.log_dir)
+            torch.save(recoder, "../" + log_name)
 
             model.train()
             begin_eval = False

@@ -1,10 +1,47 @@
 import torch
-from transformers import RobertaTokenizer
+from transformers import RobertaTokenizer,BertTokenizer,XLNetTokenizer
 from summarizer import summarize
-tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+# tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
 import random
+import re
+
+def make_tokenizer(args):
+  if args.model == "xlnet":
+    return XLNetTokenizer.from_pretrained("xlnet-base-cased")
+  
+  if args.model == "bert":
+    return BertTokenizer.from_pretrained("bert-base-uncased")
+  
+  if args.model == "roberta":
+    return RobertaTokenizer.from_pretrained("roberta-base")
+  
+
+def get_clean_line(line):
+
+    clean_line = ""
+
+    line = line.replace("’", "")
+    line = line.replace("'", "")
+    line = line.replace("-", " ") #replace hyphens with spaces
+    line = line.replace("\t", " ")
+    line = line.replace("\n", " ")
+    line = line.lower()
+
+    for char in line:
+        if char in 'qwertyuiopasdfghjklzxcvbnm,.?!;':
+            clean_line += char
+        else:
+            clean_line += ' '
+
+    clean_line = re.sub(' +',' ',clean_line) #delete extra spaces
+    if clean_line[0] == ' ':
+        clean_line = clean_line[1:]
+    if clean_line[-1] == " ":
+        clean_line = clean_line[:-1]
+    return clean_line
+
 class multiLabelDataset(torch.utils.data.Dataset):
-    def __init__(self,dataset_name,max_num,seed=41,split="train"):
+    def __init__(self,dataset_name,max_num,seed=41,split="train",aug_methods="summary"):
         random.seed(seed)
         num_labels = 5
         if dataset_name is "ag_news":
@@ -21,20 +58,23 @@ class multiLabelDataset(torch.utils.data.Dataset):
 
         labels = torch.load("../processed_data/" + dataset_name + "/" + split + "/labels")
 
-        with open ("../processed_data/" + dataset_name + "/train/summary") as fin:
-          summary = fin.readlines()
+        with open ("../processed_data/" + dataset_name + "/train/" + aug_methods) as fin:
+          aug_data = fin.readlines()
         
         if split is "test":
-          summary = text
+          aug_data = text
 
+        print(len(text))
+        print(len(labels))
+        print(len(aug_data))
         for i in range(len(text)):
-          x,y,s = text[i].strip(),labels[i],summary[i].strip()
-          if split is "train":
+          x,y,s = text[i].strip(),labels[i],aug_data[i].strip()
+          if (split == "train") and (aug_methods == "summary"):
             s = s.replace("<q>",". ")
             if "....." in s or "this this this" in s or "is is is" in s:
               s = summarize(text)
 
-          temp[y].append((y,x,s))
+          temp[y].append((y,get_clean_line(x),get_clean_line(s)))
         
         self.data = []
         for i in range(num_labels):
@@ -60,10 +100,10 @@ def collate_fn_mix(batch):
     s_perm = [s[perm_index[i]] for i in range(batch_size)]
     s_mix = [s[i] + "\n" + s_perm[i] for i in range(batch_size)]
 
-    x_ids = tokenizer(x, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
-    s_mix_ids = tokenizer(s_mix, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+    # x_ids = tokenizer(x, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+    # s_mix_ids = tokenizer(s_mix, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
 
-    return x_ids, s_mix_ids, y_a, y_b
+    return x, s_mix, y_a, y_b
 
 def collate_fn(batch):
     batch_size = len(batch)
@@ -76,7 +116,7 @@ def collate_fn(batch):
     
     s = [item[2] for item in batch]
 
-    x_ids = tokenizer(x, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
-    s_ids = tokenizer(s, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+    # x_ids = tokenizer(x, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+    # s_ids = tokenizer(s, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
 
-    return x_ids, s_ids, y_a, y_b
+    return x, s, y_a, y_b
