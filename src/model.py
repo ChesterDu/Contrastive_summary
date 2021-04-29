@@ -12,24 +12,30 @@ def make_model(args,device):
   if args.model == "roberta":
     config = RobertaConfig.from_pretrained("roberta-base")
     config.num_labels = 5
-    if args.dataset is "ag_news":
+    if args.dataset == "ag_news":
       config.num_labels = 4
+    if args.dataset == "yahoo":
+      config.num_labels = 10
     pretrained_model = RobertaForSequenceClassification.from_pretrained("roberta-base",config=config)
     return scl_model_Roberta(config,device,pretrained_model,with_semi=args.with_mix,with_sum=args.with_summary)
 
   if args.model == "bert":
     config = BertConfig.from_pretrained("bert-base-uncased")
     config.num_labels = 5
-    if args.dataset is "ag_news":
+    if args.dataset == "ag_news":
       config.num_labels = 4
+    if args.dataset == "yahoo":
+      config.num_labels = 10
     pretrained_model = BertForSequenceClassification.from_pretrained("bert-base-uncased",config=config)
     return scl_model_Bert(config,device,pretrained_model,with_semi=args.with_mix,with_sum=args.with_summary)
 
   if args.model == "xlnet":
     config = XLNetConfig.from_pretrained("xlnet-base-cased")
     config.num_labels = 5
-    if args.dataset is "ag_news":
+    if args.dataset == "ag_news":
       config.num_labels = 4
+    if args.dataset == "yahoo":
+      config.num_labels = 10
     pretrained_model = XLNetForSequenceClassification.from_pretrained("xlnet-base-cased",config=config)
     return scl_model_Xlnet(config,device,pretrained_model,with_semi=args.with_mix,with_sum=args.with_summary)
 

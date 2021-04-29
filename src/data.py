@@ -44,21 +44,27 @@ class multiLabelDataset(torch.utils.data.Dataset):
     def __init__(self,dataset_name,max_num,seed=41,split="train",aug_methods="summary"):
         random.seed(seed)
         num_labels = 5
-        if dataset_name is "ag_news":
+        if dataset_name == "ag_news":
           num_labels = 4
+        print(dataset_name)
+        if dataset_name == "yahoo":
+          print("here")
+          num_labels = 10
 
         num_per_class = int(max_num / num_labels)
-        if split is "test":
+        if dataset_name == "yahoo":
+          num_per_class = 16
+        if split == "test":
           num_per_class = int(10000 / num_labels)
         
 
         temp = {i:[] for i in range(num_labels)}
-        with open ("../processed_data/" + dataset_name + "/" + split + "/data") as fin:
+        with open ("../processed_data/" + dataset_name + "/seed-{}/".format(int(seed)) + split + "/data") as fin:
           text = fin.readlines()
 
-        labels = torch.load("../processed_data/" + dataset_name + "/" + split + "/labels")
+        labels = torch.load("../processed_data/" + dataset_name + "/seed-{}/".format(int(seed)) + split + "/labels")
 
-        with open ("../processed_data/" + dataset_name + "/train/" + aug_methods) as fin:
+        with open ("../processed_data/" + dataset_name + "/seed-{}/".format(int(seed)) + "train/" + aug_methods) as fin:
           aug_data = fin.readlines()
         
         if split is "test":

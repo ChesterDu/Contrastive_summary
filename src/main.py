@@ -106,7 +106,7 @@ if args.seed is not None:
 
 # Make Dataset
 train_dataset = multiLabelDataset(dataset_name = args.dataset,max_num=args.train_num,seed=args.seed,split="train",aug_methods = args.aug_methods)
-test_dataset = multiLabelDataset(dataset_name = args.dataset,max_num=10000,seed=args.seed,split="test",aug_methods = args.aug_methods)
+test_dataset = multiLabelDataset(dataset_name = args.dataset,max_num=1000,seed=args.seed,split="test",aug_methods = args.aug_methods)
 
 if args.with_mix:
     my_collect = collate_fn_mix
@@ -151,15 +151,16 @@ best_loss = float('inf')
 count = 0
 begin_eval = False
 
-log_name = args.model + "_" + args.aug_methods + "_"
+log_name = "Experiment/Seed-" + str(args.seed) + "/" + args.model + "/" + args.dataset + "/"
 if args.with_mix:
   log_name += "with_mix_"
 if args.with_summary:
   log_name += "with_summary_"
-log_name += args.dataset
+log_name += args.aug_methods
 log_name += str(int(args.train_num)) + "_"
 log_name += str(args.lambd) + ".pkl"
 
+print("\n")
 print(log_name)
 while(step < args.steps):
     model.train()

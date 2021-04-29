@@ -2,6 +2,8 @@ import pandas as pd
 import random
 import argparse
 import torch
+import re
+from data import get_clean_line
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str)
@@ -18,12 +20,22 @@ random.shuffle(train_data_np)
 num_labels = 5
 size = 16
 if dataset == "ag_news":
-  print(dataset)
   num_labels = 4
   size = 20
+
+if dataset == "yahoo":
+  num_labels = 10
+  size = 16
+
 lines = {i:[] for i in range(num_labels)}
+
+text_idx = 2
+if dataset == "yelp":
+  text_idx = 1
 for line in train_data_np:
-  text = line[2]
+  text = line[text_idx]
+  if type(text) == float or (len(text.split()) < 10):
+    continue
   text = text.strip()
   text = text.replace("\n"," ")
   text += "\n"
@@ -45,13 +57,21 @@ test_pd = pd.read_csv(path)
 test_data_np = test_pd.values
 random.shuffle(test_data_np)
 num_labels = 5
-size = 2000
-if dataset is "ag_news":
+size = 200
+if dataset == "ag_news":
   num_labels = 4
-  size = 2500
+  size = 250
+
+if dataset == "yahoo":
+  num_labels = 10
+  size = 100
+  
 lines = {i:[] for i in range(num_labels)}
+
 for line in test_data_np:
-  text = line[2]
+  text = line[text_idx]
+  if type(text) == float or (len(text.split()) < 10):
+    continue
   text = text.strip()
   text = text.replace("\n"," ")
   text += "\n"
@@ -65,19 +85,20 @@ for label in range(num_labels):
   random.shuffle(lines[label])
   test_data += lines[label][:size]
 
+clean_train_data = [get_clean_line(item)+'\n' for item in train_data]
+clean_test_data = [get_clean_line(item)+'\n' for item in test_data]
 
 
-
-PreSumm_input_path = "PreSumm/raw_data/" + dataset + ".txt"
+PreSumm_input_path = "PreSumm/raw_data/" + dataset + "-seed-" + str(args.seed) + ".txt"
 with open(PreSumm_input_path,"w") as fin:
-  fin.writelines(train_data)
+  fin.writelines(clean_train_data)
 
-with open("processed_data/"+dataset+"/train/data","w") as fin:
-  fin.writelines(train_data)
+with open("processed_data/"+dataset+"/seed-{}/train/data".format(int(args.seed)),"w") as fin:
+  fin.writelines(clean_train_data)
 
-with open("processed_data/"+dataset+"/test/data","w") as fin:
-  fin.writelines(test_data)
+with open("processed_data/"+dataset+"/seed-{}/test/data".format(int(args.seed)),"w") as fin:
+  fin.writelines(clean_test_data)
 
-torch.save(labels,"processed_data/"+dataset+"/train/labels")
-torch.save(test_labels,"processed_data/"+dataset+"/test/labels")
-print("sampled data saved on processed_data/"+dataset+"...")
+torch.save(labels,"processed_data/"+dataset+"/seed-{}/train/labels".format(int(args.seed)))
+torch.save(test_labels,"processed_data/"+dataset+"/seed-{}/test/labels".format(int(args.seed)))
+print("sampled data saved on processed_data/"+dataset+"/seed-{}".format(int(args.seed))+"...")
