@@ -44,6 +44,8 @@ class multiLabelDataset(torch.utils.data.Dataset):
     def __init__(self,dataset_name,max_num,seed=41,split="train",aug_methods="summary"):
         random.seed(seed)
         num_labels = 5
+        if dataset_name == "imdb":
+          num_labels = 2
         if dataset_name == "ag_news":
           num_labels = 4
         print(dataset_name)
@@ -55,7 +57,7 @@ class multiLabelDataset(torch.utils.data.Dataset):
         if dataset_name == "yahoo":
           num_per_class = 16
         if split == "test":
-          num_per_class = int(10000 / num_labels)
+          num_per_class = int(1000 / num_labels)
         
 
         temp = {i:[] for i in range(num_labels)}
@@ -64,9 +66,19 @@ class multiLabelDataset(torch.utils.data.Dataset):
 
         labels = torch.load("../processed_data/" + dataset_name + "/seed-{}/".format(int(seed)) + split + "/labels")
 
-        with open ("../processed_data/" + dataset_name + "/seed-{}/".format(int(seed)) + "train/" + aug_methods) as fin:
-          aug_data = fin.readlines()
         
+        
+        if split=="train" and "+" in aug_methods:
+          text += text
+          labels += labels
+          with open ("../processed_data/" + dataset_name + "/seed-{}/".format(int(seed)) + "train/" + "summary") as fin:
+            aug_data = fin.readlines()
+          with open ("../processed_data/" + dataset_name + "/seed-{}/".format(int(seed)) + "train/" + "eda") as fin:
+            aug_data += fin.readlines()
+        if split=="train" and "+" not in aug_methods:
+          with open ("../processed_data/" + dataset_name + "/seed-{}/".format(int(seed)) + "train/" + aug_methods) as fin:
+            aug_data = fin.readlines()
+
         if split is "test":
           aug_data = text
 

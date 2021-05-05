@@ -12,6 +12,8 @@ def make_model(args,device):
   if args.model == "roberta":
     config = RobertaConfig.from_pretrained("roberta-base")
     config.num_labels = 5
+    if args.dataset == "imdb":
+      config.num_labels = 2
     if args.dataset == "ag_news":
       config.num_labels = 4
     if args.dataset == "yahoo":
@@ -22,6 +24,8 @@ def make_model(args,device):
   if args.model == "bert":
     config = BertConfig.from_pretrained("bert-base-uncased")
     config.num_labels = 5
+    if args.dataset == "imdb":
+      config.num_labels = 2
     if args.dataset == "ag_news":
       config.num_labels = 4
     if args.dataset == "yahoo":
@@ -32,6 +36,8 @@ def make_model(args,device):
   if args.model == "xlnet":
     config = XLNetConfig.from_pretrained("xlnet-base-cased")
     config.num_labels = 5
+    if args.dataset == "imdb":
+      config.num_labels = 2
     if args.dataset == "ag_news":
       config.num_labels = 4
     if args.dataset == "yahoo":

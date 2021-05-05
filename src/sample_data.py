@@ -26,6 +26,9 @@ if dataset == "ag_news":
 if dataset == "yahoo":
   num_labels = 10
   size = 16
+if dataset == "imdb":
+  num_labels = 2
+  size = 40
 
 lines = {i:[] for i in range(num_labels)}
 
@@ -39,7 +42,7 @@ for line in train_data_np:
   text = text.strip()
   text = text.replace("\n"," ")
   text += "\n"
-  label = line[0] - 1
+  label = int(line[0]) - 1
   lines[label].append(text)
 
 train_data = []
@@ -65,6 +68,10 @@ if dataset == "ag_news":
 if dataset == "yahoo":
   num_labels = 10
   size = 100
+
+if dataset == "imdb":
+  num_labels = 2
+  size = 500
   
 lines = {i:[] for i in range(num_labels)}
 
