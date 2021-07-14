@@ -5,7 +5,7 @@ from copy import deepcopy
 from transformers import RobertaModel, RobertaConfig, RobertaForSequenceClassification
 from transformers import BertModel, BertConfig, BertForSequenceClassification
 from transformers import XLNetModel, XLNetConfig, XLNetForSequenceClassification
-from data import collate_fn, collate_fn_mix, multiLabelDataset, make_tokenizer
+from data import collate_fn, collate_fn_mix, multiLabelDataset, make_tokenizer,collate_fn_feature_mix
 from torch.utils.data import TensorDataset, DataLoader
 import argparse
 import random
@@ -58,7 +58,7 @@ def evaluate_model(model, test_loader, recoder, step):
     total = 0
     with torch.no_grad():
         for batch in test_loader:
-            x, s_mix, y_a, y_b = batch
+            x,x_perm,s,s_perm,y_a, y_b = batch
             x_ids = tokenizer(x, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
             # s_ids = tokenizer(s, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
             seq_ids = x_ids.to(device)
@@ -95,6 +95,7 @@ parser.add_argument("--model",type=str,default="xlnet")
 parser.add_argument('--dataset',type=str,default="amazon")
 parser.add_argument('--train_num',type=float,default=80)
 parser.add_argument('--with_summary',action='store_true')
+parser.add_argument("--feature_mix",action='store_true')
 
 args = parser.parse_args()
 
@@ -112,6 +113,10 @@ if args.with_mix:
     my_collect = collate_fn_mix
 else:
     my_collect = collate_fn
+
+if args.feature_mix:
+  my_collect = collate_fn_feature_mix
+
 train_loader = DataLoader(train_dataset, num_workers=2, batch_size=args.batch_size, shuffle=True, collate_fn = my_collect)
 test_loader = DataLoader(test_dataset, num_workers=2, batch_size=args.eval_batch_size,shuffle=False,collate_fn=my_collect)
 
@@ -158,20 +163,27 @@ if args.with_summary:
   log_name += "with_summary_"
 log_name += args.aug_methods
 log_name += str(int(args.train_num)) + "_"
+if args.feature_mix:
+  log_name += "feature_mix_"
 log_name += str(args.lambd) + ".pkl"
+
 
 print("\n")
 print(log_name)
 while(step < args.steps):
     model.train()
-    for x,s,y_a,y_b in train_loader:
+    for x,x_perm,s,s_perm,y_a,y_b in train_loader:
         # print(batch)
         x_ids = tokenizer(x, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+        x_perm_ids = tokenizer(x_perm, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
         s_ids = tokenizer(s, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
+        s_perm_ids = tokenizer(s_perm, padding = 'max_length', max_length = 200, truncation = True, return_tensors="pt")["input_ids"]
         # print(x_ids)
-        batch = [x_ids,s_ids,y_a,y_b]
-
-        ce_loss_x, ce_loss_s, scl_loss = model(batch)
+        batch = [x_ids,x_perm_ids,s_ids,s_perm_ids,y_a,y_b]
+        if args.feature_mix:
+          ce_loss_x, ce_loss_s, scl_loss = model.forward_feature_mix(batch)
+        else:
+          ce_loss_x, ce_loss_s, scl_loss = model(batch)
         ce_loss = (ce_loss_x + ce_loss_s)/2
         if not args.with_summary:
             ce_loss = ce_loss_x

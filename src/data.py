@@ -123,6 +123,19 @@ def collate_fn_mix(batch):
 
     return x, s_mix, y_a, y_b
 
+def collate_fn_feature_mix(batch):
+  batch_size = len(batch)
+  perm_index = torch.randperm(batch_size)
+  y_a = torch.LongTensor([item[0] for item in batch])
+  y_b = y_a[perm_index]
+  x = [item[1] for item in batch]
+  s = [item[2] for item in batch]
+  s_perm = [s[perm_index[i]] for i in range(batch_size)]
+  x_perm = [x[perm_index[i]] for i in range(batch_size)]
+  
+
+  return x,x_perm,s,s_perm,y_a,y_b
+
 def collate_fn(batch):
     batch_size = len(batch)
     perm_index = torch.randperm(batch_size)

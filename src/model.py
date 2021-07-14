@@ -137,6 +137,36 @@ class scl_model_Roberta(nn.Module):
         
 
         return ce_loss_x, ce_loss_s, scl_loss
+    def forward_feature_mix(self,batch):
+
+        x,x_perm,s,s_perm,y_a,y_b = [item.to(self.device) for item in batch]
+        f_x = 0.5 * self.f(x)[0] + 0.5 * self.f(x_perm)[0]
+        f_s = 0.5 * self.f(s)[0] + 0.5 * self.f(s_perm)[0]
+
+        p_x = self.cls_x(f_x)
+        # p_s = self.cls_s(f_s)
+        p_s = self.cls_x(f_s)
+        
+        # print(p_x.shape)
+        # print(y_a.shape)
+
+        
+        ce_loss_s = (self.ce_criterion(p_s,y_a) + self.ce_criterion(p_s,y_b)) / 2
+        ce_loss_x = (self.ce_criterion(p_x,y_a) + self.ce_criterion(p_x,y_b)) / 2
+
+        z_x = self.mlp_x(f_x[:,0,:]).unsqueeze(1)
+        # z_x = f_x[:,0,:].unsqueeze(1)
+        # z_s = self.mlp_s(f_s[:,0,:]).unsqueeze(1)
+        z_s = self.mlp_x(f_s[:,0,:]).unsqueeze(1)
+
+        # z_s = f_s[:,0,:].unsqueeze(1)
+        z = torch.cat([z_x,z_s],dim=1)
+
+        scl_loss = (self.scl_criterion(z,labels = y_a) + self.scl_criterion(z,labels = y_b)) / 2
+
+        
+
+        return ce_loss_x, ce_loss_s, scl_loss
 
 
 
